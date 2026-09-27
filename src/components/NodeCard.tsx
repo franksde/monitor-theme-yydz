@@ -115,8 +115,9 @@ export function Country({ node }: { node: Node }) {
 }
 
 /**
- * The distribution's logo in its brand colour. Mixed toward white on the dark
- * theme, where AlmaLinux's black and CentOS's navy would otherwise vanish.
+ * The distribution's logo in its brand colour, standing in for the name, which
+ * shows on hover. Mixed toward white on the dark theme, where AlmaLinux's black
+ * and CentOS's navy would otherwise vanish.
  */
 function OsIcon({ os }: { os: string }) {
   const name = os.toLowerCase()
@@ -124,10 +125,11 @@ function OsIcon({ os }: { os: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      aria-hidden
+      role="img"
       style={{ "--brand": `#${icon.hex}` } as CSSProperties}
       className="size-3 shrink-0 fill-(--brand) dark:fill-[color-mix(in_oklab,var(--brand)_60%,white)]"
     >
+      <title>{osName(os)}</title>
       <path d={icon.path} />
     </svg>
   )
@@ -175,15 +177,15 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-1.5">
-            <h3 className="truncate font-medium" title={node.name}>{node.name}</h3>
             <Country node={node} />
+            <h3 className="truncate font-medium" title={node.name}>{node.name}</h3>
           </div>
           <p className="mt-1 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
             {node.os && <OsIcon os={node.os} />}
             <span className="truncate">
-              {node.os ? osName(node.os) : "等待首次上报"}
-              {node.virt && node.virt !== "none" ? ` · ${node.virt}` : ""}
-              {node.arch ? ` · ${node.arch}` : ""}
+              {node.os
+                ? [node.virt !== "none" && node.virt, node.arch].filter(Boolean).join(" · ")
+                : "等待首次上报"}
             </span>
           </p>
         </div>
