@@ -2,16 +2,16 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-// The shell only. shadcn's card ships a header, title, description, action,
-// content and footer alongside it; this theme lays out its cards itself, so all
-// six were unused from the moment they were vendored. Restore one from upstream
-// if a card ever needs it.
+/**
+ * 基础卡片外壳组件
+ * 遵循 AGENT.md 规范：采用微倒角 rounded-[2px]，具备细腻边框和响应式平滑过渡
+ */
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card"
       className={cn(
-        "flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm",
+        "flex flex-col gap-6 rounded-[2px] border border-border/80 bg-card py-6 text-card-foreground shadow-xs transition-all duration-200",
         className
       )}
       {...props}
@@ -20,3 +20,4 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 export { Card }
+

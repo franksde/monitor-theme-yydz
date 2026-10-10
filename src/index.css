@@ -1,88 +1,80 @@
-/* Scan this app's own source and nothing else. Tailwind's automatic detection
-   walks the whole repository, turning a word in a Rust file or a document into a
-   utility class in the shipped stylesheet: `.filter` and `.transform` were
-   here because api.rs calls `.filter(...)`. Worse than the wasted bytes, it
-   made the build depend on files that have nothing to do with it -- adding an
-   unrelated workflow changed the CSS, and with it the content hash of every
-   asset. */
+/* 限制 Tailwind 扫描范围仅针对本应用自身源代码，避免多余类名污染 */
 @import "tailwindcss" source(none);
 @source "../index.html";
 @source "../src";
 
 @custom-variant dark (&:is(.dark *));
 
+/* ==========================================================================
+   浅色模式设计变量：贯彻 AGENT.md 规范，严格采用微倒角（2px）与工业精密美学
+   ========================================================================== */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.18 0 0);
+  /* 微倒角规范：彻底摒弃大圆角，统一为精密微倒角 2px */
+  --radius: 2px;
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.14 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0 0);
-  --primary: oklch(0.18 0 0);
+  --card-foreground: oklch(0.14 0 0);
+  --primary: oklch(0.14 0 0);
   --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.96 0 0);
-  --secondary-foreground: oklch(0.18 0 0);
-  --muted: oklch(0.955 0 0);
-  --muted-foreground: oklch(0.52 0 0);
-  --accent: oklch(0.955 0 0);
-  --accent-foreground: oklch(0.18 0 0);
-  --destructive: oklch(0.3 0 0);
-  --border: oklch(0.9 0 0);
-  --ring: oklch(0.62 0 0);
-  --chart-1: oklch(0.3 0 0);
-  --chart-2: oklch(0.45 0 0);
-  --chart-3: oklch(0.58 0 0);
-  --chart-4: oklch(0.7 0 0);
-  --chart-5: oklch(0.82 0 0);
-  /* Greyscale has no green or amber, so lightness carries both: --ok draws the
-     download line, lighter than the upload's --chart-1, and --warn an expiry
-     within a week, darker than the muted text beside it. */
-  --ok: oklch(0.62 0 0);
-  --warn: oklch(0.44 0 0);
-  /* The status dot. Each clears 3:1 against the card (3.7 and 5.5), and 1.5:1
-     against the other, the separation red-green colour blindness still
-     perceives. */
-  --online: oklch(0.6 0.16 150);
+  --secondary: oklch(0.95 0 0);
+  --secondary-foreground: oklch(0.14 0 0);
+  --muted: oklch(0.94 0 0);
+  --muted-foreground: oklch(0.48 0 0);
+  --accent: oklch(0.94 0 0);
+  --accent-foreground: oklch(0.14 0 0);
+  --destructive: oklch(0.45 0.2 25);
+  --border: oklch(0.88 0 0);
+  --ring: oklch(0.4 0 0);
+  --chart-1: oklch(0.25 0 0);
+  --chart-2: oklch(0.42 0 0);
+  --chart-3: oklch(0.55 0 0);
+  --chart-4: oklch(0.68 0 0);
+  --chart-5: oklch(0.8 0 0);
+  --ok: oklch(0.55 0 0);
+  --warn: oklch(0.45 0.12 70);
+  /* 状态指示色：明快通透的在线呼吸绿与沉稳离线灰 */
+  --online: oklch(0.62 0.18 145);
   --offline: oklch(0.52 0 0);
 }
 
-/* `color-scheme` draws the browser's own controls -- the checkbox,
-   scrollbars -- in the dark palette as well. */
+/* ==========================================================================
+   深色模式设计变量：深邃高质感黑灰底色与精密微发光线条
+   ========================================================================== */
 .dark {
   color-scheme: dark;
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.98 0 0);
-  --card: oklch(0.2 0 0);
-  --card-foreground: oklch(0.98 0 0);
-  --primary: oklch(0.92 0 0);
-  --primary-foreground: oklch(0.2 0 0);
-  --secondary: oklch(0.27 0 0);
-  --secondary-foreground: oklch(0.98 0 0);
-  --muted: oklch(0.27 0 0);
-  --muted-foreground: oklch(0.7 0 0);
-  --accent: oklch(0.27 0 0);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.95 0 0);
-  --border: oklch(1 0 0 / 12%);
-  --ring: oklch(0.55 0 0);
+  --background: oklch(0.12 0 0);
+  --foreground: oklch(0.96 0 0);
+  --card: oklch(0.16 0 0);
+  --card-foreground: oklch(0.96 0 0);
+  --primary: oklch(0.96 0 0);
+  --primary-foreground: oklch(0.12 0 0);
+  --secondary: oklch(0.22 0 0);
+  --secondary-foreground: oklch(0.96 0 0);
+  --muted: oklch(0.22 0 0);
+  --muted-foreground: oklch(0.65 0 0);
+  --accent: oklch(0.24 0 0);
+  --accent-foreground: oklch(0.96 0 0);
+  --destructive: oklch(0.65 0.22 25);
+  --border: oklch(1 0 0 / 10%);
+  --ring: oklch(0.6 0 0);
   --chart-1: oklch(0.95 0 0);
-  --chart-2: oklch(0.82 0 0);
-  --chart-3: oklch(0.68 0 0);
-  --chart-4: oklch(0.54 0 0);
-  --chart-5: oklch(0.42 0 0);
-  /* Inverted against the dark ground: --warn is brighter than the muted text. */
-  --ok: oklch(0.62 0 0);
-  --warn: oklch(0.79 0 0);
-  /* 7.8 and 3.7 against the card, 2.1 apart. The muted grey would sit 1.15 from
-     the green. */
-  --online: oklch(0.72 0.17 150);
-  --offline: oklch(0.55 0 0);
+  --chart-2: oklch(0.8 0 0);
+  --chart-3: oklch(0.65 0 0);
+  --chart-4: oklch(0.5 0 0);
+  --chart-5: oklch(0.38 0 0);
+  --ok: oklch(0.65 0 0);
+  --warn: oklch(0.8 0.14 75);
+  /* 深色下通透发光的在线绿与离线哑光灰 */
+  --online: oklch(0.72 0.19 145);
+  --offline: oklch(0.45 0 0);
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: 1px;
+  --radius-md: 2px;
+  --radius-lg: 3px;
+  --radius-xl: 4px;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -111,11 +103,59 @@
 
 @layer base {
   * { @apply border-border outline-ring/50; }
-  /* Reserve the scrollbar's width on every page: without it, leaving a route
-     whose content exceeds the fold widens the page. */
-  html { scrollbar-gutter: stable; }
-  body { @apply bg-background text-foreground; }
+  /* 固定滚动条槽位，防止详情页切换与内容抖动 */
+  html {
+    scrollbar-gutter: stable;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    /* 细腻的工业精密网格点阵底纹（低透明度） */
+    background-image: radial-gradient(circle at 1px 1px, oklch(0.5 0 0 / 4%) 1px, transparent 0);
+    background-size: 24px 24px;
+  }
+  .dark body {
+    background-image: radial-gradient(circle at 1px 1px, oklch(1 0 0 / 4%) 1px, transparent 0);
+  }
 }
 
-/* Tabular figures keep live numbers from shifting as they update. */
+/* ==========================================================================
+   动效与工具样式：遵循 AGENT.md 要求的平滑过渡动画
+   ========================================================================== */
+
+/* 数字等宽排版，保证数值高频刷新时不跳动 */
 .tnum { font-variant-numeric: tabular-nums; }
+
+/* 页面和组件渐入平滑动画 */
+@keyframes fadeInSlide {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeInSlide 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 在线状态呼吸辉光微动效 */
+@keyframes pulseDot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: 0 0 0 0 oklch(var(--online) / 40%);
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.85;
+    box-shadow: 0 0 6px 1px oklch(var(--online) / 50%);
+  }
+}
+
+.pulse-online {
+  animation: pulseDot 2.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

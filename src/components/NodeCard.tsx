@@ -68,6 +68,10 @@ function deployed(node: Node) {
  * has been absent -- the first question asked of an offline node. Both are
  * durations, so the badge keeps its shape either way.
  */
+/**
+ * 节点在线状态徽标
+ * 遵循 AGENT.md 规范：指示灯采用微倒角 rounded-[1px]，在线时呈现呼吸辉光，离线时呈现沉稳微暗色
+ */
 export function Status({ node }: { node: Node }) {
   const down = sinceSeen(node)
   const label = node.online
@@ -76,15 +80,20 @@ export function Status({ node }: { node: Node }) {
       ? `离线 ${down >= 60 ? uptime(down) : ""}`
       : "未接入"
   return (
-    // Muted once it stops reporting: the figures on the page are genuine, merely
-    // no longer current.
     <Badge
-      className={cn("tnum shrink-0 gap-1.5 font-normal", !node.online && "text-muted-foreground")}
+      className={cn(
+        "tnum shrink-0 gap-1.5 font-normal tracking-tight transition-all duration-150",
+        !node.online && "text-muted-foreground opacity-80"
+      )}
     >
       <span
         className={cn(
-          "size-1.5 rounded-full",
-          node.online ? "bg-online" : deployed(node) ? "bg-offline" : "bg-muted-foreground/40",
+          "size-1.5 rounded-[1px] transition-all",
+          node.online
+            ? "bg-online pulse-online"
+            : deployed(node)
+              ? "bg-offline"
+              : "bg-muted-foreground/40",
         )}
       />
       {label.trim()}
@@ -92,7 +101,7 @@ export function Status({ node }: { node: Node }) {
   )
 }
 
-/** Where the machine is: its flag, or the bare code for one the set lacks. */
+/** 节点所在地国家/地区旗帜（微倒角 rounded-[2px]） */
 export function Country({ node }: { node: Node }) {
   if (!node.country) return null
   const src = FLAGS[node.country]
@@ -108,16 +117,12 @@ export function Country({ node }: { node: Node }) {
       src={src}
       alt={node.country}
       title={node.country}
-      className="h-3 w-4.5 shrink-0 rounded-[2px] ring-1 ring-foreground/10"
+      className="h-3 w-4.5 shrink-0 rounded-[2px] shadow-2xs ring-1 ring-foreground/10"
     />
   )
 }
 
-/**
- * The distribution's logo in its brand colour, standing in for the name, which
- * shows on hover. Mixed toward white on the dark theme, where AlmaLinux's black
- * and CentOS's navy would otherwise vanish.
- */
+/** 操作系统发行版图标 */
 function OsIcon({ os }: { os: string }) {
   const name = os.toLowerCase()
   const icon = DISTROS.find(([key]) => name.includes(key))?.[1] ?? siLinux
@@ -134,52 +139,50 @@ function OsIcon({ os }: { os: string }) {
   )
 }
 
-// Traffic uses the plan's own counting rule, so the bar matches the quota the
-// node is billed against.
+// 流量使用计算与格式化
 function trafficFoot(node: Node) {
   return node.traffic_limit > 0
     ? pair(monthUsage(node), node.traffic_limit)
     : `${bytes(monthUsage(node))} / ${FOREVER}`
 }
 
-// No date means nothing expires: a permanent host, or one with no renewal set. A
-// blank corner asserts neither. The days are the hub's count: it renews an online
-// node by its own calendar, and counting on the visitor's would show the node
-// expired for hours before that. Only a hub from before `expires_in` leaves the
-// count to the browser.
+/** 到期日指示器：过期标红，临期预警，永久显示无限符号 */
 function Expiry({ node }: { node: Node }) {
   const days = node.expires_in !== undefined ? node.expires_in : daysUntil(node.expires_at)
   if (days === null) return <span className="text-xs text-muted-foreground" title="永不到期">{FOREVER}</span>
-  const tone = days < 0 ? "text-destructive" : days <= 7 ? "text-warn" : "text-muted-foreground"
+  const tone = days < 0 ? "text-destructive font-medium" : days <= 7 ? "text-warn font-medium" : "text-muted-foreground"
   return (
-    <span className={cn("tnum text-xs", tone)}>
+    <span className={cn("tnum text-xs transition-colors", tone)}>
       {days < 0 ? `已过期 ${-days} 天` : `${days} 天后到期`}
     </span>
   )
 }
 
+/**
+ * 节点卡片组件
+ * 遵循 AGENT.md 规范：采用微倒角 rounded-[2px]，具备微提升发光 Hover 动效与平滑过渡
+ */
 export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
   const m = node.metrics
 
   return (
     <Card
       onClick={onOpen}
-      // min-w-0: a grid item sizes to its content unless told otherwise, and the
-      // OS line below does not wrap, so on a phone the card would grow past its
-      // column and scroll the page sideways. The truncate inside only takes effect
-      // once the card is allowed to be narrower.
-      className="min-w-0 cursor-pointer gap-0 p-4 transition-colors hover:border-ring"
+      className="group min-w-0 cursor-pointer gap-0 rounded-[2px] border border-border/80 bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/40 hover:shadow-md active:translate-y-0"
       role="button"
       tabIndex={0}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpen())}
     >
+      {/* 头部：节点名称、国家与状态 */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-1.5">
             <Country node={node} />
-            <h3 className="truncate font-medium" title={node.name}>{node.name}</h3>
+            <h3 className="truncate font-semibold tracking-tight transition-colors group-hover:text-foreground" title={node.name}>
+              {node.name}
+            </h3>
           </div>
-          <p className="mt-1 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+          <p className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             {node.os && <OsIcon os={node.os} />}
             <span className="truncate">
               {node.os
@@ -188,21 +191,17 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
             </span>
           </p>
         </div>
-        {/* State right, identity left, one line each. */}
+        {/* 状态与到期时间 */}
         <div className="flex shrink-0 flex-col items-end gap-1">
           <Status node={node} />
           <Expiry node={node} />
         </div>
       </div>
 
-      {/* One layout for both states: a disconnected node still knows its
-          cores, memory, disk size and traffic totals, and showing those with
-          the live figures blank beats a stretched card with one line in it. */}
+      {/* 资源指标度量网格 */}
       {deployed(node) ? (
         <>
-          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4">
-            {/* The core count belongs beside the word CPU: it is what the
-                percentage and the load averages are both measured against. */}
+          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5">
             <Meter
               label={`CPU ${node.cpu_cores} 核`}
               pct={m ? m.cpu : null}
@@ -226,30 +225,29 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
             />
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-4 text-xs">
-            <span className="tnum inline-flex items-center gap-1.5">
+          {/* 实时网速与累计流量横栏 */}
+          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-1.5 border-t border-border/60 pt-3 text-xs">
+            <span className="tnum inline-flex items-center gap-1 font-medium text-foreground">
               <ArrowDown className="size-3 text-muted-foreground" />
               {m ? rate(m.net_rx) : "—"}
             </span>
-            <span className="tnum inline-flex items-center gap-1.5">
+            <span className="tnum inline-flex items-center gap-1 font-medium text-foreground">
               <ArrowUp className="size-3 text-muted-foreground" />
               {m ? rate(m.net_tx) : "—"}
             </span>
-            <span className="tnum inline-flex items-center gap-1.5 text-muted-foreground">
-              <ArrowDown className="size-3" />
+            <span className="tnum inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+              <ArrowDown className="size-3 opacity-70" />
               {bytes(node.total_rx)}
             </span>
-            <span className="tnum inline-flex items-center gap-1.5 text-muted-foreground">
-              <ArrowUp className="size-3" />
+            <span className="tnum inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+              <ArrowUp className="size-3 opacity-70" />
               {bytes(node.total_tx)}
             </span>
           </div>
         </>
       ) : (
-        /* Never connected: nothing to plot, so the card stays short rather than
-           padding out to match its neighbours. */
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          还没有接入。在后台生成安装命令并执行一次。
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+          还没有接入。在后台生成安装命令并在目标主机执行一次。
         </p>
       )}
     </Card>

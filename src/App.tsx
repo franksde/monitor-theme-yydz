@@ -8,19 +8,17 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { api, groupsOf, useNodes, type Node } from "@/lib/api"
 import { loadConfig } from "@/lib/config"
 
-// `history_days` is absent from hubs predating the hourly tier, which kept a
-// week for anonymous callers.
+// 站点信息接口类型定义（history_days 在早于按小时归档分档的 hub 版本中不存在）
 type Me = { authed: boolean; github: boolean; site_name: string; public_page: boolean; history_days?: number }
 
-// Split out because recharts is most of this bundle and the list page draws no
-// chart. The landing page is 288 kB rather than 678 kB (95 kB gzipped against
-// 207 kB), with the rest fetched immediately after it paints.
+// 动态懒加载详情页组件：由于 recharts 库体积较大，单独拆包可使首屏体积减少一半以上
 const loadDetail = () => import("@/components/NodeDetail").then((m) => ({ default: m.NodeDetail }))
 const NodeDetail = lazy(loadDetail)
 
-// `/node/{id}` is a real page: it survives a reload, can be linked to, and back
-// leaves the detail view rather than the site. The hub serves index.html for any
-// unknown path, so no server-side route is required.
+/**
+ * 客户端轻量路由 Hook：基于 popstate 监听与 pushState 实现 /node/{id} 导航
+ * 任何未知路径 hub 均回落至 index.html，无需服务端路由介入
+ */
 function useNodeRoute() {
   const read = () => {
     const match = location.pathname.match(/^\/node\/(\d+)/)
@@ -36,11 +34,9 @@ function useNodeRoute() {
     id,
     (next: number | null) => {
       const path = next === null ? "/" : `/node/${next}`
-      // The site name leads to the list from the list as well, and each repeat
-      // would otherwise cost one more press of back.
       if (location.pathname !== path) history.pushState({}, "", path)
       setId(next)
-      scrollTo(0, 0)
+      scrollTo({ top: 0, behavior: "smooth" })
     },
   ] as const
 }
@@ -48,16 +44,8 @@ function useNodeRoute() {
 const DARK_MEDIA = matchMedia("(prefers-color-scheme: dark)")
 
 /**
- * The visitor's own choice, or the system's while there is none. Only the toggle
- * writes the choice down: persisting the system's answer on load would pin it,
- * leaving a visitor who never touched the toggle in whichever mode their system
- * happened to be in that day. The panel at `/admin/` shares this key on one
- * origin, so it has to hold to the same rule -- one app writing on load pins the
- * others.
- *
- * The system's answer is subscribed to rather than copied into state: a flip
- * landing between the first render and the effect that would have attached the
- * listener is otherwise never heard, and the next one is a day away.
+ * 深色/浅色主题管理 Hook
+ * 监听系统偏好与 localStorage，在切换瞬间临时禁用全局过渡以防止颜色错位混杂
  */
 function useTheme() {
   const [saved, setSaved] = useState(() => localStorage.getItem("theme"))
@@ -70,16 +58,12 @@ function useTheme() {
   )
   const dark = saved ? saved === "dark" : system
 
-  // Switched with every transition held. Cards, buttons and badges fade their
-  // colours over 150 ms while everything else changes at once, so a meter bar
-  // already in the dark palette would vanish into a card still white.
   useEffect(() => {
+    // 切换模式时临时锁定过渡，防止渐变期间卡片背景与前景色产生闪白
     const hold = document.createElement("style")
     hold.textContent = "*,*::before,*::after{transition:none!important}"
     document.head.append(hold)
     document.documentElement.classList.toggle("dark", dark)
-    // Resolves the new colours while transitions are off, so removing the
-    // hold starts none.
     void document.body.offsetWidth
     hold.remove()
   }, [dark])
@@ -94,6 +78,9 @@ function useTheme() {
   ] as const
 }
 
+/**
+ * 主应用组件
+ */
 export default function App() {
   const [dark, toggleTheme] = useTheme()
   const [me, setMe] = useState<Me | null>(null)
@@ -101,7 +88,7 @@ export default function App() {
   const [config, setConfig] = useState<Record<string, unknown> | null>(null)
   const { nodes, error, closed } = useNodes()
   const [open, go] = useNodeRoute()
-  // The list's group tab, held here so it survives a visit to a node's page.
+  // 当前选中的分组 Tab
   const [group, setGroup] = useState<string | null>(null)
 
   const loadMe = useCallback(() => {
@@ -112,20 +99,13 @@ export default function App() {
 
   useEffect(() => {
     loadMe()
-    // Requested alongside /me, not after it. It never rejects: any failure
-    // yields the defaults.
+    // 站点设置与 /me 并行加载
     void loadConfig().then(setConfig)
-    // Warmed here rather than left to Suspense, which requests the chunk only
-    // once a render reaches the detail view, itself waiting on /me. Without this
-    // the split trades its first paint for a full-page skeleton over the first
-    // node opened: 2.6s click-to-chart on 4G against 1.4s unsplit, 1.7s warm.
+    // 静默预热加载详情页 chunk，提升首次点击响应速度
     void loadDetail()
   }, [loadMe])
 
-  // The status page was closed while this tab was open. `me` holds whatever it
-  // reported at load, so it is re-queried; the effect below then directs an
-  // anonymous visitor to the panel rather than leaving them on a list that
-  // stopped updating with only a red line to explain it.
+  // 公开页关闭且非管理员登录时，自动跳转到内置后台
   useEffect(() => {
     if (closed) void loadMe()
   }, [closed, loadMe])
@@ -137,50 +117,70 @@ export default function App() {
   const sorted = [...(nodes ?? [])].sort((a, b) => a.sort - b.sort || a.id - b.id)
   const selected = sorted.find((n) => n.id === open)
 
-  // `/node/{id}` is a page people bookmark and share, so the tab needs the node's
-  // name. The site name rather than a fixed string, since the hub lets an operator
-  // rename the site.
+  // 动态同步网页 Title
   useEffect(() => {
     document.title = [selected?.name, me?.site_name || "Monitor"].filter(Boolean).join(" · ")
   }, [selected?.name, me?.site_name])
 
-  // Only while there is nothing else to show. Once `me` has loaded, a later
-  // failure belongs beside the page rather than over it.
+  // 首屏未加载完成时的占位骨架
   if (!me) return (
     <div className="grid min-h-svh place-items-center p-6 text-sm text-muted-foreground">
-      {meError ? <div className="space-y-3 text-center"><p role="alert">加载失败：{meError}</p><Button onClick={loadMe}>重试</Button></div> : "加载中…"}
+      {meError ? (
+        <div className="space-y-3 text-center">
+          <p role="alert" className="text-destructive font-medium">加载失败：{meError}</p>
+          <Button onClick={loadMe}>重试</Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <span className="size-2 rounded-[1px] bg-foreground/60 pulse-online" />
+          <span>正在连接监控节点…</span>
+        </div>
+      )}
     </div>
   )
 
-  // The status page is closed and nobody is signed in: redirect to the panel.
   if (!me.public_page && !me.authed) return null
 
   return (
     <div className="min-h-svh">
-      <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-3 sm:px-6">
-          {/* The site name is the way back to the list, so a node page needs
-              no back button of its own. */}
-          <button className="font-semibold transition-opacity hover:opacity-70" onClick={() => go(null)}>
-            {me.site_name || "Monitor"}
+      {/* 顶部导航栏：精细微倒角磨砂玻璃质感 */}
+      <header className="sticky top-0 z-30 border-b border-border/80 bg-background/85 backdrop-blur-md transition-colors">
+        <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-2.5 sm:px-6">
+          {/* 点击站点名返回主列表 */}
+          <button
+            className="flex items-center gap-2 font-bold tracking-tight text-foreground transition-opacity hover:opacity-75 active:scale-[0.99]"
+            onClick={() => go(null)}
+          >
+            <span className="flex size-4.5 items-center justify-center rounded-[2px] bg-foreground text-[10px] font-black text-background">
+              M
+            </span>
+            <span>{me.site_name || "Monitor"}</span>
           </button>
           <div className="flex-1" />
-          {/* The panel is a separate app built into the hub, not part of this
-              theme, so this is a navigation rather than a route. */}
-          <Button variant="ghost" size="sm" asChild>
+          {/* 管理后台入口 */}
+          <Button variant="ghost" size="sm" asChild className="text-xs">
             <a href="/admin/">
-              <Wrench /> {me.authed ? "进入后台" : "登录"}
+              <Wrench className="size-3.5" />
+              <span>{me.authed ? "进入后台" : "登录"}</span>
             </a>
           </Button>
-          <Button variant="ghost" size="icon" onClick={toggleTheme} title="切换主题">
-            {dark ? <Sun /> : <Moon />}
+          {/* 深浅色模式切换按钮 */}
+          <Button variant="ghost" size="icon" onClick={toggleTheme} title="切换主题" className="size-8">
+            {dark ? <Sun className="size-4 text-warn" /> : <Moon className="size-4" />}
           </Button>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1400px] space-y-5 px-4 py-4 sm:px-6">
-        {error && <p className="text-sm text-destructive">{error}</p>}
+      {/* 主视图区域：包含平滑动效与响应式栅格 */}
+      <main className="mx-auto max-w-[1400px] space-y-5 px-4 py-5 sm:px-6">
+        {/* 全局连接异常警示卡片 */}
+        {error && (
+          <div className="animate-fade-in flex items-center justify-between rounded-[2px] border border-destructive/30 bg-destructive/10 px-3.5 py-2 text-xs font-medium text-destructive">
+            <span>{error}</span>
+          </div>
+        )}
 
+        {/* 详情页路由视图 vs 节点主列表视图 */}
         {open !== null ? (
           !nodes ? (
             <Skeleton className="h-96" />
@@ -189,80 +189,96 @@ export default function App() {
               <NodeDetail node={selected} historyDays={me.history_days ?? 7} />
             </Suspense>
           ) : (
-            <p className="py-16 text-center text-sm text-muted-foreground">
-              节点不存在或未公开。<button className="underline" onClick={() => go(null)}>返回列表</button>
-            </p>
+            <div className="animate-fade-in py-20 text-center text-xs text-muted-foreground">
+              <p>节点不存在或未公开。</p>
+              <Button variant="secondary" size="sm" className="mt-3" onClick={() => go(null)}>
+                返回列表
+              </Button>
+            </div>
           )
         ) : !nodes || !config ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {[0, 1, 2].map((i) => (
+            {[0, 1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-72" />
             ))}
           </div>
         ) : (
-          <NodeList
-            nodes={sorted}
-            group={group}
-            summary={config.show_summary === true}
-            onGroup={setGroup}
-            onOpen={go}
-          />
+          <div className="animate-fade-in space-y-4">
+            <NodeList
+              nodes={sorted}
+              group={group}
+              summary={config.show_summary === true}
+              onGroup={setGroup}
+              onOpen={go}
+            />
+          </div>
         )}
       </main>
     </div>
   )
 }
 
-// Group tabs appear only once the operator has grouped something, so a hub
-// without groups keeps the page it always had. The summary follows the tab.
+/**
+ * 节点列表展示组件（包含分组切换 Tab、数据汇总卡片与卡片网格）
+ */
 function NodeList({ nodes, group, summary, onGroup, onOpen }: {
   nodes: Node[]
-  /** null is every node, "" the ungrouped. */
   group: string | null
-  /** The operator's `show_summary` setting. */
   summary: boolean
   onGroup: (group: string | null) => void
   onOpen: (id: number) => void
 }) {
   const groups = groupsOf(nodes)
   const ungrouped = nodes.filter((n) => !n.group).length
-  // A tab that has since emptied or been renamed -- 未分组 included -- falls back
-  // to every node rather than to an empty page, and is forgotten, so a later
-  // group of the same name does not take the page over.
+
+  // 分组有效性回退保护
   const current = group === null || (group === "" ? ungrouped > 0 : groups.includes(group)) ? group : null
   useEffect(() => {
     if (current !== group) onGroup(current)
   }, [current, group, onGroup])
+
   const shown = current === null ? nodes : nodes.filter((n) => (n.group ?? "") === current)
   const tabs = [
     [null, "全部", nodes.length] as const,
     ...groups.map((g) => [g, g, nodes.filter((n) => n.group === g).length] as const),
     ...(ungrouped ? [["", "未分组", ungrouped] as const] : []),
   ]
+
   return (
     <>
+      {/* 分组切换选项卡 */}
       {groups.length > 0 && (
-        <div role="group" aria-label="分组" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
+        <div role="group" aria-label="分组" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
           {tabs.map(([value, label, count]) => (
             <Button
-              // Group names are free text, so they carry a prefix no key of
-              // the 全部 tab can share.
               key={value === null ? "*" : `=${value}`}
               aria-pressed={current === value}
               size="sm"
               variant={current === value ? "secondary" : "ghost"}
-              className="shrink-0"
+              className={`shrink-0 rounded-[2px] transition-all duration-150 ${
+                current === value
+                  ? "border-border/80 font-semibold shadow-2xs"
+                  : "opacity-75 hover:opacity-100"
+              }`}
               onClick={() => onGroup(value)}
             >
-              {label}
-              <span className="tnum text-muted-foreground">{count}</span>
+              <span>{label}</span>
+              <span className="tnum ml-1 rounded-[1px] bg-muted/60 px-1 py-0.2 text-[10px] text-muted-foreground">
+                {count}
+              </span>
             </Button>
           ))}
         </div>
       )}
+
+      {/* 顶部四格指标汇总 */}
       {summary && <Summary nodes={shown} group={current} />}
+
+      {/* 节点卡片网格 */}
       {nodes.length === 0 ? (
-        <p className="py-16 text-center text-sm text-muted-foreground">还没有节点</p>
+        <div className="py-20 text-center text-xs text-muted-foreground">
+          还没有接入任何节点
+        </div>
       ) : (
         <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {shown.map((n) => (
@@ -273,3 +289,4 @@ function NodeList({ nodes, group, summary, onGroup, onOpen }: {
     </>
   )
 }
+

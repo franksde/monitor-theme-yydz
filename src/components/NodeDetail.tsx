@@ -65,14 +65,20 @@ const RESOURCE_SERIES = {
     ),
 }
 
-// Nor does the tooltip slide. Entering a chart at its right edge, it appears
-// beside the cursor first and would glide 400 ms back within the chart,
-// overhanging the page by up to 140 px and flashing a horizontal scrollbar.
+// 图表悬浮提示框 Tooltip 配置：遵循微倒角与全局一致样式
 const TOOLTIP = {
   isAnimationActive: false,
   labelFormatter: (ts: unknown) => new Date(Number(ts)).toLocaleString("zh-CN"),
-  contentStyle: { fontSize: 12 },
+  contentStyle: {
+    fontSize: 12,
+    borderRadius: 2,
+    border: "1px solid var(--color-border)",
+    background: "var(--color-card)",
+    color: "var(--color-foreground)",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+  },
 }
+
 
 // One width for every stacked panel's value axis. Sized to their own labels --
 // 40px under "100%", 68px under "172 MB" -- the four plot areas would be offset by
@@ -113,8 +119,10 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   )
 }
 
-// `narrow` tightens the padding on a phone, so the seven windows of a year of
-// history fit one row of a 360px screen.
+/**
+ * 详情页标签与时间窗口切换按钮
+ * 遵循 AGENT.md 规范：采用微倒角 rounded-[2px]，具有柔和的交互动效
+ */
 function Tab({ active, onClick, narrow = false, children }: {
   active: boolean
   onClick: () => void
@@ -125,14 +133,19 @@ function Tab({ active, onClick, narrow = false, children }: {
     <button
       aria-pressed={active}
       onClick={onClick}
-      className={`rounded-md py-1 text-xs transition-colors ${narrow ? "px-1.5 sm:px-2.5" : "px-2.5"} ${
-        active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+      className={`rounded-[2px] py-1 text-xs font-medium transition-all duration-150 ${
+        narrow ? "px-1.5 sm:px-2.5" : "px-2.5"
+      } ${
+        active
+          ? "bg-primary text-primary-foreground shadow-xs"
+          : "text-muted-foreground hover:bg-muted/70 hover:text-foreground active:scale-[0.98]"
       }`}
     >
       {children}
     </button>
   )
 }
+
 
 /**
  * How many samples of a probe's own series make up seven minutes of neighbours.
@@ -373,13 +386,12 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
   }
 
   return (
-    <div className="space-y-4">
-      {/* Wraps below the name on a phone, where the badges beside it would
-          leave a 320px screen two characters of it. */}
+    <div className="animate-fade-in space-y-4">
+      {/* 头部：国旗、节点名称、在线状态及 agent 版本 */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <div className="flex min-w-0 items-center gap-2">
           <Country node={node} />
-          <h2 className="truncate text-lg font-medium" title={node.name}>{node.name}</h2>
+          <h2 className="truncate text-lg font-semibold tracking-tight" title={node.name}>{node.name}</h2>
         </div>
         <Status node={node} />
         {node.agent_version && (
@@ -389,10 +401,7 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
         )}
       </div>
 
-      {/* One flat grid of facts: one machine's spec sheet, where a box around
-          a single topic would be just a box. Three across at lg, two at md, one
-          on a phone -- a kernel version or a CPU model needs about 270px to
-          stay whole. */}
+      {/* 节点硬件规格与计费信息网格 */}
       <dl className="grid gap-x-6 gap-y-3 md:grid-cols-2 lg:grid-cols-3">
         <Fact label="系统" value={[osName(node.os), node.kernel].filter(Boolean).join(" · ")} />
         <Fact
@@ -418,9 +427,13 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
         />
       </dl>
 
+      {/* 管理员备注信息（仅登录可见） */}
       {node.remark && (
-        <p className="rounded-md bg-muted px-3 py-2 text-sm whitespace-pre-wrap">{node.remark}</p>
+        <p className="rounded-[2px] border border-border/70 bg-muted/40 px-3 py-2 text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
+          {node.remark}
+        </p>
       )}
+
 
       <div className="space-y-2 border-t pt-4">
         <div className="flex gap-1">
@@ -587,9 +600,10 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
                       onClick={() =>
                         setHiddenProbes((h) => (shown ? [...h, s.id] : h.filter((id) => id !== s.id)))
                       }
-                      className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-opacity ${
-                        shown ? "" : "opacity-40"
+                      className={`inline-flex items-center gap-1.5 rounded-[2px] border border-border/80 px-2 py-1 text-xs transition-all duration-150 active:scale-[0.98] ${
+                        shown ? "bg-muted/40 hover:bg-muted" : "opacity-40"
                       }`}
+
                     >
                       {/* The swatch carries the same shade and dash as the line. */}
                       <svg width="14" height="6" className="shrink-0" aria-hidden>

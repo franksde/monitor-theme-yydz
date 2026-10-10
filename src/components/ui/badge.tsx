@@ -2,15 +2,16 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-// The outline badge only, the one this theme draws. shadcn's ships five more
-// variants and `asChild`, all unused, and every variant's classes would land in
-// the stylesheet.
+/**
+ * 徽标组件
+ * 遵循 AGENT.md 规范：采用精密微倒角 rounded-[2px]，替代过去的胶囊大圆角形态
+ */
 function Badge({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
       data-slot="badge"
       className={cn(
-        "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-border px-2 py-0.5 text-xs font-medium whitespace-nowrap text-foreground [&>svg]:pointer-events-none [&>svg]:size-3",
+        "inline-flex w-fit shrink-0 items-center justify-center gap-1.5 overflow-hidden rounded-[2px] border border-border/80 bg-muted/40 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-foreground transition-colors duration-150 [&>svg]:pointer-events-none [&>svg]:size-3",
         className
       )}
       {...props}
@@ -19,3 +20,4 @@ function Badge({ className, ...props }: React.ComponentProps<"span">) {
 }
 
 export { Badge }
+
