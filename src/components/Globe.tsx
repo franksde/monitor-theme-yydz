@@ -118,7 +118,7 @@ export function Globe({
     if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current)
     leaveTimerRef.current = setTimeout(() => {
       setActiveCard(null)
-    }, 180)
+    }, 220)
   }
 
   // 鼠标进入小卡片：取消关闭倒计时，保持小卡片常驻
@@ -134,7 +134,7 @@ export function Globe({
     if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current)
     leaveTimerRef.current = setTimeout(() => {
       setActiveCard(null)
-    }, 180)
+    }, 220)
   }
 
   const totalPlaced = geoNodes.length
@@ -196,10 +196,10 @@ export function Globe({
 
       {/* 核心展示区：左侧平面地图大屏，右侧地区控制台 */}
       <div className="mt-3.5 grid gap-4 lg:grid-cols-12 lg:items-center">
-        {/* 平面地图视口 */}
+        {/* 平面地图视口（设置 z-30 高于右侧列表，移除 overflow-hidden 确保悬浮弹窗绝不被任何外部容器截断遮挡） */}
         <div
           ref={containerRef}
-          className="relative col-span-12 flex items-center justify-center overflow-hidden rounded-[2px] border border-border/40 bg-muted/15 p-2 select-none lg:col-span-8"
+          className="relative z-30 col-span-12 flex items-center justify-center rounded-[2px] border border-border/40 bg-muted/15 p-2 select-none lg:col-span-8"
         >
           <svg
             viewBox={`0 0 ${FLAT_MAP_VIEW.width} ${FLAT_MAP_VIEW.height}`}
@@ -383,16 +383,16 @@ export function Globe({
           {/* 鼠标移动到亮点上之后显示的小卡片：列出对应节点，主机名 + 在线状态（一个绿色的点点） */}
           {activeCard && (
             <div
-              className="absolute z-20 min-w-[190px] max-w-[290px] rounded-[2px] border border-border/80 bg-card/95 p-2.5 text-xs shadow-lg backdrop-blur-xs transition-all duration-75 select-none animate-fade-in"
+              className="absolute z-50 min-w-[190px] max-w-[280px] rounded-[2px] border border-border/80 bg-card/95 p-2.5 text-xs shadow-xl backdrop-blur-xs transition-all duration-75 select-none animate-fade-in"
               style={{
                 left: `${activeCard.x}px`,
                 top: `${activeCard.y}px`,
                 transform: `translate(${
-                  activeCard.x > activeCard.containerWidth * 0.65
-                    ? "calc(-100% - 12px)"
-                    : "12px"
+                  activeCard.x > activeCard.containerWidth * 0.5
+                    ? "calc(-100% - 14px)"
+                    : "14px"
                 }, ${
-                  activeCard.y < 80
+                  activeCard.y < 70
                     ? "0%"
                     : activeCard.y > activeCard.containerHeight * 0.75
                       ? "-100%"
@@ -450,8 +450,8 @@ export function Globe({
           )}
         </div>
 
-        {/* 右侧：地区测控控制台与统计面板 */}
-        <div className="col-span-12 flex flex-col gap-2.5 lg:col-span-4">
+        {/* 右侧：地区测控控制台与统计面板（设置 z-10，使左侧地图及弹窗 z-30/z-50 拥有更高绝对层级） */}
+        <div className="relative z-10 col-span-12 flex flex-col gap-2.5 lg:col-span-4">
           <div className="flex items-center justify-between border-b border-border/50 pb-1.5">
             <span className="text-xs font-medium text-foreground">地区测控列表</span>
             {selectedRegion ? (
