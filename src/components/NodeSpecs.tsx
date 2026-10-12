@@ -1,0 +1,292 @@
+/**
+ * 节点硬件规格与系统环境展示组件 (Node Specifications & Overview)
+ * 具备：顶部全景控制栏、工控微倒角四格规格矩阵（计算系统/内存存储/网络流量/服务周期）、
+ * 优雅的内嵌微进度条与清晰的层次过渡。
+ * 遵循 AGENT.md 规范：采用微倒角 (2px)、全中文注释、工业仪器极简美学、零多余外部依赖。
+ */
+
+import {
+  Activity,
+  ArrowUpDown,
+  Calendar,
+  Clock,
+  Cpu,
+  Server,
+  Shield,
+} from "lucide-react"
+
+import { Badge } from "@/components/ui/badge"
+import { Country, Status } from "@/components/NodeCard"
+import type { Node } from "@/lib/api"
+import { cn } from "@/lib/utils"
+import {
+  bytes,
+  cpuName,
+  cycle,
+  daysUntil,
+  FOREVER,
+  money,
+  osName,
+  pair,
+  percent,
+  rate,
+  uptime,
+} from "@/lib/format"
+import { resolveNodeGeo } from "@/lib/geo"
+
+export type NodeSpecsProps = {
+  node: Node
+}
+
+export function NodeSpecs({ node }: NodeSpecsProps) {
+  const m = node.metrics
+  const geo = resolveNodeGeo(node)
+
+  // 内存与磁盘使用率计算
+  const memPct = m ? percent(m.mem_used, node.mem_total) : null
+  const diskPct = m ? percent(m.disk_used, node.disk_total) : null
+  const swapPct = m && node.swap_total > 0 ? percent(m.swap_used, node.swap_total) : null
+
+  // 流量使用格式化
+  const trafficText =
+    node.traffic_limit > 0
+      ? pair(node.month_rx + node.month_tx, node.traffic_limit)
+      : `${bytes(node.month_rx + node.month_tx)} / ${FOREVER}`
+
+  // 到期天数计算
+  const daysLeft = node.expires_in !== undefined ? node.expires_in : daysUntil(node.expires_at)
+
+  return (
+    <div className="space-y-3.5">
+      {/* 1. 顶部全景控制栏：国旗、节点名称、在线指示灯、Agent 版本、地理坐标与实时遥测指标胶囊 */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[2px] border border-border/80 bg-card/80 p-3.5 shadow-2xs backdrop-blur-xs">
+        {/* 左侧：主机标识与属性徽章 */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Country node={node} />
+          <h2 className="truncate text-lg font-bold tracking-tight text-foreground" title={node.name}>
+            {node.name}
+          </h2>
+          <Status node={node} />
+
+          {node.group && (
+            <Badge className="rounded-[2px] text-[11px] font-normal bg-secondary text-secondary-foreground border-transparent">
+              {node.group}
+            </Badge>
+          )}
+
+          {node.agent_version && (
+            <Badge className="rounded-[2px] font-mono text-[10px] text-muted-foreground border-border/70 bg-transparent">
+              v{node.agent_version}
+            </Badge>
+          )}
+
+          {geo && (
+            <span className="hidden items-center text-xs text-muted-foreground font-mono sm:inline-flex">
+              {geo.city}, {geo.country}
+            </span>
+          )}
+        </div>
+
+        {/* 右侧：实时关键遥测指标胶囊（运行时长、负载、实时网络速率） */}
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+          {m && m.uptime > 0 && (
+            <div className="flex items-center gap-1.5 rounded-[2px] border border-border/60 bg-muted/40 px-2 py-1">
+              <Clock className="size-3 text-muted-foreground/80" />
+              <span className="font-mono text-[11px]">{uptime(m.uptime)}</span>
+            </div>
+          )}
+
+          {m && (
+            <div className="flex items-center gap-1.5 rounded-[2px] border border-border/60 bg-muted/40 px-2 py-1">
+              <Activity className="size-3 text-muted-foreground/80" />
+              <span className="font-mono text-[11px]">
+                负载 {m.load.map((l) => l.toFixed(2)).join(" / ")}
+              </span>
+            </div>
+          )}
+
+          {m && (
+            <div className="flex items-center gap-1.5 rounded-[2px] border border-border/60 bg-muted/40 px-2 py-1">
+              <ArrowUpDown className="size-3 text-muted-foreground/80" />
+              <span className="font-mono text-[11px]">
+                ↓ {rate(m.net_rx)} · ↑ {rate(m.net_tx)}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 2. 工控规格指标卡片矩阵：4 格结构化展示，信息层次清晰，间距分明 */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {/* 卡片 A：计算与系统架构 */}
+        <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs transition-colors hover:border-border">
+          <div className="flex items-center gap-2 border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
+            <Server className="size-3.5 text-primary" />
+            <span>系统与计算架构</span>
+          </div>
+          <div className="divide-y divide-border/30 text-xs">
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">操作系统</span>
+              <span className="truncate font-mono font-medium text-foreground max-w-[150px]" title={[osName(node.os), node.kernel].filter(Boolean).join(" ")}>
+                {osName(node.os)} {node.kernel ? `(${node.kernel})` : ""}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">CPU 处理器</span>
+              <span className="truncate font-mono font-medium text-foreground max-w-[150px]" title={node.cpu_name ? cpuName(node.cpu_name) : "CPU"}>
+                {node.cpu_name ? `${cpuName(node.cpu_name)}` : "CPU"} × {node.cpu_cores} 核
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">架构 / 虚拟化</span>
+              <span className="font-mono font-medium text-foreground">
+                {node.arch} · {node.virt !== "none" ? node.virt : "物理机"}
+                {m ? ` · ${m.procs} 进程` : ""}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 卡片 B：内存与存储容量 */}
+        <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs transition-colors hover:border-border">
+          <div className="flex items-center gap-2 border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
+            <Cpu className="size-3.5 text-primary" />
+            <span>内存与存储容量</span>
+          </div>
+          <div className="divide-y divide-border/30 text-xs">
+            <div className="py-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">物理内存</span>
+                <span className="font-mono font-medium text-foreground">
+                  {bytes(m?.mem_used ?? 0)} / {bytes(node.mem_total)}
+                </span>
+              </div>
+              {memPct !== null && (
+                <div className="mt-1 h-1 w-full overflow-hidden rounded-[1px] bg-muted/80">
+                  <div
+                    className="h-full bg-primary transition-all duration-300"
+                    style={{ width: `${Math.min(100, Math.max(0, memPct))}%` }}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="py-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">交换分区 Swap</span>
+                <span className="font-mono font-medium text-foreground">
+                  {node.swap_total > 0
+                    ? `${bytes(m?.swap_used ?? 0)} / ${bytes(node.swap_total)}`
+                    : "未启用"}
+                </span>
+              </div>
+              {swapPct !== null && (
+                <div className="mt-1 h-1 w-full overflow-hidden rounded-[1px] bg-muted/80">
+                  <div
+                    className="h-full bg-chart-3 transition-all duration-300"
+                    style={{ width: `${Math.min(100, Math.max(0, swapPct))}%` }}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="py-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">磁盘空间</span>
+                <span className="font-mono font-medium text-foreground">
+                  {bytes(m?.disk_used ?? 0)} / {bytes(node.disk_total)}
+                </span>
+              </div>
+              {diskPct !== null && (
+                <div className="mt-1 h-1 w-full overflow-hidden rounded-[1px] bg-muted/80">
+                  <div
+                    className="h-full bg-primary transition-all duration-300"
+                    style={{ width: `${Math.min(100, Math.max(0, diskPct))}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 卡片 C：网络吞吐与流量 */}
+        <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs transition-colors hover:border-border">
+          <div className="flex items-center gap-2 border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
+            <Activity className="size-3.5 text-primary" />
+            <span>网络吞吐与流量</span>
+          </div>
+          <div className="divide-y divide-border/30 text-xs">
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">实时速率</span>
+              <span className="font-mono font-medium text-foreground">
+                ↓ {rate(m?.net_rx ?? 0)} · ↑ {rate(m?.net_tx ?? 0)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">今日流量</span>
+              <span className="font-mono font-medium text-foreground">
+                ↓ {bytes(node.day_rx)} · ↑ {bytes(node.day_tx)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">本月用量</span>
+              <span className="font-mono font-medium text-foreground">
+                {trafficText}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 卡片 D：服务周期与连接 */}
+        <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs transition-colors hover:border-border">
+          <div className="flex items-center gap-2 border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
+            <Calendar className="size-3.5 text-primary" />
+            <span>服务周期与连接</span>
+          </div>
+          <div className="divide-y divide-border/30 text-xs">
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">资费周期</span>
+              <span className="font-mono font-medium text-foreground">
+                {node.price > 0
+                  ? `${money(node.price, node.currency)} / ${cycle(node.billing_cycle)}`
+                  : "免费"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">到期时间</span>
+              <div className="flex items-center gap-1 font-mono font-medium text-foreground">
+                <span>{node.expires_at ? `${node.expires_at}` : FOREVER}</span>
+                {daysLeft !== null && daysLeft <= 15 && (
+                  <Badge
+                    className={cn(
+                      "h-4 px-1 text-[9px] rounded-[1px]",
+                      daysLeft <= 3
+                        ? "border-destructive/40 bg-destructive/15 text-destructive"
+                        : "border-border/60 bg-muted/60 text-muted-foreground"
+                    )}
+                  >
+                    {daysLeft <= 0 ? "已过期" : `剩${daysLeft}天`}
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">连接追踪</span>
+              <span className="font-mono font-medium text-foreground">
+                {m ? `TCP ${m.tcp} · UDP ${m.udp}` : "—"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. 管理员备忘与备注信息（仅在存在时展示） */}
+      {node.remark && (
+        <div className="flex items-start gap-2 rounded-[2px] border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          <Shield className="mt-0.5 size-3.5 shrink-0 opacity-70" />
+          <p className="leading-relaxed whitespace-pre-wrap">{node.remark}</p>
+        </div>
+      )}
+    </div>
+  )
+}

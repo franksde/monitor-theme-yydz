@@ -1,0 +1,836 @@
+/**
+ * 节点系统资源监控全景组件 (Resource Charts & Telemetry)
+ * 具备：
+ * 1. 实时与窗口 Use 比例度量条 (CPU / 内存 / 磁盘 / 流量消耗)
+ * 2. 内存与存储容量分布环形饼图 (Donut Charts)
+ * 3. 24 时段负载活动热力图 (Activity Heatmap)
+ * 4. 深度时序曲线面积图 (CPU / 内存 / 对数带宽峰值带 / 硬盘)
+ * 5. 多视图自由切换胶囊 (综合总览 / 时序走势 / 负载热力 / 占比分布)
+ * 遵循 AGENT.md 规范：采用微倒角 (2px)、全中文注释、工业仪器极简美学、零多余外部依赖。
+ */
+
+import { useMemo, useState } from "react"
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Cell,
+  ComposedChart,
+  Line,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  type DotItemDotProps,
+} from "recharts"
+import {
+  Activity,
+  Cpu,
+  Flame,
+  HardDrive,
+  Layers,
+  PieChart as PieIcon,
+  TrendingUp,
+} from "lucide-react"
+
+import type { Node } from "@/lib/api"
+import {
+  axisBytes,
+  bytes,
+  percent,
+  quarters,
+  rate,
+  RATE_FLOOR,
+  rateAxis,
+  tickClock,
+  timeTicks,
+  withGaps,
+} from "@/lib/format"
+import { cn } from "@/lib/utils"
+
+export type MetricPoint = {
+  ts: number
+  cpu: number
+  mem_used: number
+  disk_used: number
+  net_rx: number
+  net_tx: number
+  net_rx_max?: number
+  net_tx_max?: number
+}
+
+export type ResourceChartsProps = {
+  node: Node
+  metrics: MetricPoint[]
+  hours: number
+}
+
+// 视图模式定义
+type ViewMode = "overview" | "trends" | "heatmap" | "donut"
+
+const AXIS = { stroke: "currentColor", fontSize: 11, tickLine: false, axisLine: false }
+const VALUE_AXIS = { ...AXIS, width: 68, interval: 0 }
+const SERIES = { dot: false as const, strokeWidth: 1.5, isAnimationActive: false }
+const RESOURCE_SERIES = {
+  ...SERIES,
+  dot: ({ cx, cy, index, points, stroke }: DotItemDotProps) =>
+    cy == null || points[index - 1]?.y != null || points[index + 1]?.y != null ? null : (
+      <circle cx={cx} cy={cy} r={2} fill={stroke} />
+    ),
+}
+
+const TOOLTIP_STYLE = {
+  isAnimationActive: false,
+  labelFormatter: (ts: unknown) => new Date(Number(ts)).toLocaleString("zh-CN"),
+  contentStyle: {
+    fontSize: 12,
+    borderRadius: 2,
+    border: "1px solid var(--color-border)",
+    background: "var(--color-card)",
+    color: "var(--color-foreground)",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+  },
+}
+
+export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>("overview")
+  const [hoveredHeatCell, setHoveredHeatCell] = useState<{
+    label: string
+    avgCpu: number
+    maxCpu: number
+    memUsed: number
+    rxRate: number
+    txRate: number
+  } | null>(null)
+
+  const m = node.metrics
+
+  // 1. 数据行预处理（单位对齐与对数底数处理）
+  const metricRows = useMemo(() => {
+    const lift = (v: number) => Math.max(v, RATE_FLOOR)
+    return metrics.map((p) => ({
+      ...p,
+      ts: p.ts * 1_000,
+      rx: lift(p.net_rx),
+      tx: lift(p.net_tx),
+      rx_band: [lift(p.net_rx), lift(p.net_rx_max ?? p.net_rx)],
+      tx_band: [lift(p.net_tx), lift(p.net_tx_max ?? p.net_tx)],
+    }))
+  }, [metrics])
+
+  // 断点补齐行
+  const chartRows = useMemo(() => withGaps(metricRows), [metricRows])
+
+  // 峰值数据
+  const peak = useMemo(() => {
+    if (!metrics.some((m) => m.net_rx_max !== undefined)) return null
+    const max = (pick: (m: MetricPoint) => number | undefined) =>
+      metrics.reduce((hi, m) => Math.max(hi, pick(m) ?? 0), 0)
+    return { rx: max((m) => m.net_rx_max), tx: max((m) => m.net_tx_max) }
+  }, [metrics])
+
+  // 坐标轴配置
+  const axes = useMemo(() => {
+    const max = (pick: (m: (typeof metricRows)[number]) => number) =>
+      metricRows.reduce((hi, m) => Math.max(hi, pick(m)), 0)
+    const cpuMax = max((m) => m.cpu)
+    const cpuTop = Math.min(100, Math.max(10, Math.ceil(cpuMax / 10) * 10))
+    return {
+      cpu: { domain: [0, cpuTop], ticks: quarters(cpuTop) },
+      rate: rateAxis(
+        metricRows.reduce((lo, m) => Math.min(lo, m.rx, m.tx), Infinity),
+        max((m) => Math.max(m.rx_band[1], m.tx_band[1]))
+      ),
+    }
+  }, [metricRows])
+
+  // 2. 统计聚合指标计算（平均与极值）
+  const stats = useMemo(() => {
+    if (metricRows.length === 0) {
+      return {
+        avgCpu: m?.cpu ?? 0,
+        maxCpu: m?.cpu ?? 0,
+        avgMem: m?.mem_used ?? 0,
+        maxMem: m?.mem_used ?? 0,
+        avgRx: m?.net_rx ?? 0,
+        maxRx: m?.net_rx ?? 0,
+        avgTx: m?.net_tx ?? 0,
+        maxTx: m?.net_tx ?? 0,
+      }
+    }
+    const totalCpu = metricRows.reduce((acc, r) => acc + r.cpu, 0)
+    const maxCpu = metricRows.reduce((acc, r) => Math.max(acc, r.cpu), 0)
+    const totalMem = metricRows.reduce((acc, r) => acc + r.mem_used, 0)
+    const maxMem = metricRows.reduce((acc, r) => Math.max(acc, r.mem_used), 0)
+    const totalRx = metricRows.reduce((acc, r) => acc + r.net_rx, 0)
+    const maxRx = metricRows.reduce((acc, r) => Math.max(acc, r.net_rx), 0)
+    const totalTx = metricRows.reduce((acc, r) => acc + r.net_tx, 0)
+    const maxTx = metricRows.reduce((acc, r) => Math.max(acc, r.net_tx), 0)
+
+    return {
+      avgCpu: totalCpu / metricRows.length,
+      maxCpu,
+      avgMem: totalMem / metricRows.length,
+      maxMem,
+      avgRx: totalRx / metricRows.length,
+      maxRx,
+      avgTx: totalTx / metricRows.length,
+      maxTx,
+    }
+  }, [metricRows, m])
+
+  // 3. 内存与存储环形饼图数据
+  const ramPieData = useMemo(() => {
+    const total = node.mem_total || 1
+    const used = m ? m.mem_used : stats.avgMem
+    const free = Math.max(0, total - used)
+    return [
+      { name: "已用内存", value: used, color: "var(--color-primary)" },
+      { name: "空闲可用", value: free, color: "var(--color-muted)" },
+    ]
+  }, [node.mem_total, m, stats.avgMem])
+
+  const diskPieData = useMemo(() => {
+    const total = node.disk_total || 1
+    const used = m ? m.disk_used : (metricRows[metricRows.length - 1]?.disk_used ?? 0)
+    const free = Math.max(0, total - used)
+    return [
+      { name: "已用磁盘", value: used, color: "var(--color-chart-2)" },
+      { name: "剩余空间", value: free, color: "var(--color-muted)" },
+    ]
+  }, [node.disk_total, m, metricRows])
+
+  const trafficPieData = useMemo(() => {
+    const rx = node.month_rx || node.day_rx || 1
+    const tx = node.month_tx || node.day_tx || 1
+    return [
+      { name: "下行入网 (RX)", value: rx, color: "var(--color-ok)" },
+      { name: "上行出网 (TX)", value: tx, color: "var(--color-chart-1)" },
+    ]
+  }, [node.month_rx, node.month_tx, node.day_rx, node.day_tx])
+
+  // 4. 活动热力图（将历史时序切分为 24 等分时间桶）
+  const heatmapBuckets = useMemo(() => {
+    if (metricRows.length === 0) return []
+    const bucketCount = 24
+    const minTs = metricRows[0].ts
+    const maxTs = metricRows[metricRows.length - 1].ts
+    const duration = Math.max(1, maxTs - minTs)
+    const step = duration / bucketCount
+
+    const buckets = Array.from({ length: bucketCount }, (_, i) => {
+      const bMin = minTs + i * step
+      const bMax = bMin + step
+      const items = metricRows.filter((r) => r.ts >= bMin && r.ts < bMax)
+      const count = items.length || 1
+
+      const avgCpu = items.reduce((acc, r) => acc + r.cpu, 0) / count
+      const maxCpu = items.reduce((acc, r) => Math.max(acc, r.cpu), 0)
+      const memUsed = items.reduce((acc, r) => acc + r.mem_used, 0) / count
+      const rxRate = items.reduce((acc, r) => acc + r.net_rx, 0) / count
+      const txRate = items.reduce((acc, r) => acc + r.net_tx, 0) / count
+
+      const dateObj = new Date(bMin)
+      const label = `${String(dateObj.getHours()).padStart(2, "0")}:${String(dateObj.getMinutes()).padStart(2, "0")}`
+
+      return {
+        index: i,
+        label,
+        avgCpu,
+        maxCpu,
+        memUsed,
+        rxRate,
+        txRate,
+      }
+    })
+
+    return buckets
+  }, [metricRows])
+
+  // 时间轴配置
+  const timeAxis = (rows: { ts: number }[], from = 0, to = rows.length - 1) => {
+    const ticks = rows.length ? timeTicks(rows[from].ts, rows[to].ts) : []
+    return {
+      dataKey: "ts",
+      type: "number" as const,
+      domain: ["dataMin", "dataMax"] as const,
+      ticks,
+      tickFormatter: tickClock(ticks, hours),
+      minTickGap: hours > 24 ? 72 : 40,
+      ...AXIS,
+    }
+  }
+
+  // 瞬时百分比计算
+  const currentCpuPct = m ? m.cpu : stats.avgCpu
+  const currentMemPct = m ? percent(m.mem_used, node.mem_total) : percent(stats.avgMem, node.mem_total)
+  const currentDiskPct = m
+    ? percent(m.disk_used, node.disk_total)
+    : percent(metricRows[metricRows.length - 1]?.disk_used ?? 0, node.disk_total)
+  const currentTrafficPct =
+    node.traffic_limit > 0
+      ? percent(node.month_rx + node.month_tx, node.traffic_limit)
+      : null
+
+  return (
+    <div className="space-y-4">
+      {/* 视图模式切换胶囊 */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2.5">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Activity className="size-3.5 text-primary" />
+          <span className="font-semibold text-foreground">主机资源分析测控</span>
+          <span className="text-[11px] opacity-70">
+            · {metricRows.length} 采样点 · 涵盖最近 {hours} 小时
+          </span>
+        </div>
+
+        {/* 模式选择按钮组 */}
+        <div className="flex items-center gap-1 rounded-[2px] border border-border/60 bg-muted/30 p-0.5 text-xs">
+          <button
+            type="button"
+            onClick={() => setViewMode("overview")}
+            className={cn(
+              "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors",
+              viewMode === "overview"
+                ? "bg-primary text-primary-foreground font-medium shadow-2xs"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Activity className="size-3" />
+            <span>全景仪表</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode("trends")}
+            className={cn(
+              "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors",
+              viewMode === "trends"
+                ? "bg-primary text-primary-foreground font-medium shadow-2xs"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <TrendingUp className="size-3" />
+            <span>时序曲线</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode("heatmap")}
+            className={cn(
+              "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors",
+              viewMode === "heatmap"
+                ? "bg-primary text-primary-foreground font-medium shadow-2xs"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Flame className="size-3" />
+            <span>负载热力</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode("donut")}
+            className={cn(
+              "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors",
+              viewMode === "donut"
+                ? "bg-primary text-primary-foreground font-medium shadow-2xs"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <PieIcon className="size-3" />
+            <span>占比饼图</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 1. USE 比例图：CPU、内存、硬盘、流量比例工控仪表矩阵 */}
+      {(viewMode === "overview" || viewMode === "donut") && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* CPU 综合使用率 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <Cpu className="size-3.5 text-primary" />
+                <span>CPU 核心负荷</span>
+              </span>
+              <span className="font-mono text-xs font-semibold text-foreground">
+                {currentCpuPct.toFixed(1)}%
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+              <div
+                className={cn(
+                  "h-full transition-all duration-300",
+                  currentCpuPct > 80
+                    ? "bg-destructive"
+                    : currentCpuPct > 60
+                      ? "bg-warn"
+                      : "bg-primary"
+                )}
+                style={{ width: `${Math.min(100, Math.max(0, currentCpuPct))}%` }}
+              />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+              <span>均值 {stats.avgCpu.toFixed(1)}%</span>
+              <span>峰值 {stats.maxCpu.toFixed(1)}%</span>
+            </div>
+          </div>
+
+          {/* 内存空间使用率 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <Layers className="size-3.5 text-primary" />
+                <span>物理内存占用</span>
+              </span>
+              <span className="font-mono text-xs font-semibold text-foreground">
+                {currentMemPct.toFixed(1)}%
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+              <div
+                className="h-full bg-foreground transition-all duration-300"
+                style={{ width: `${Math.min(100, Math.max(0, currentMemPct))}%` }}
+              />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+              <span>已用 {bytes(m ? m.mem_used : stats.avgMem)}</span>
+              <span>总量 {bytes(node.mem_total)}</span>
+            </div>
+          </div>
+
+          {/* 存储空间占用率 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <HardDrive className="size-3.5 text-primary" />
+                <span>系统存储占用</span>
+              </span>
+              <span className="font-mono text-xs font-semibold text-foreground">
+                {currentDiskPct.toFixed(1)}%
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+              <div
+                className={cn(
+                  "h-full transition-all duration-300",
+                  currentDiskPct > 90 ? "bg-destructive" : "bg-foreground"
+                )}
+                style={{ width: `${Math.min(100, Math.max(0, currentDiskPct))}%` }}
+              />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+              <span>已用 {bytes(m ? m.disk_used : 0)}</span>
+              <span>总量 {bytes(node.disk_total)}</span>
+            </div>
+          </div>
+
+          {/* 网络出入吞吐 / 流量配额消耗 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <Activity className="size-3.5 text-primary" />
+                <span>网络带宽吞吐</span>
+              </span>
+              <span className="font-mono text-xs font-semibold text-foreground">
+                {currentTrafficPct !== null ? `${currentTrafficPct.toFixed(1)}%` : "实时"}
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+              <div
+                className="h-full bg-ok transition-all duration-300"
+                style={{
+                  width: `${currentTrafficPct !== null ? Math.min(100, currentTrafficPct) : 100}%`,
+                }}
+              />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+              <span>↓ {rate(m ? m.net_rx : stats.avgRx)}</span>
+              <span>↑ {rate(m ? m.net_tx : stats.avgTx)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. 环形饼图分布模块：内存分布、磁盘分布、网络流量占比 */}
+      {(viewMode === "overview" || viewMode === "donut") && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {/* 内存环形饼图 */}
+          <div className="flex flex-col rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
+            <div className="border-b border-border/40 pb-1.5 text-xs font-medium text-foreground">
+              物理内存分布比例
+            </div>
+            <div className="relative mt-2 flex h-32 items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip
+                    contentStyle={TOOLTIP_STYLE.contentStyle}
+                    formatter={(v) => bytes(Number(v))}
+                  />
+                  <Pie
+                    data={ramPieData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={36}
+                    outerRadius={50}
+                    stroke="var(--color-card)"
+                    strokeWidth={2}
+                  >
+                    {ramPieData.map((entry, index) => (
+                      <Cell key={`ram-cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="font-mono text-sm font-bold text-foreground">
+                  {currentMemPct.toFixed(0)}%
+                </span>
+                <span className="text-[9px] text-muted-foreground">已用占比</span>
+              </div>
+            </div>
+            <div className="mt-1 flex items-center justify-around border-t border-border/30 pt-2 text-[11px] font-mono">
+              <div className="flex items-center gap-1.5">
+                <span className="size-2 rounded-[0.5px] bg-primary" />
+                <span className="text-muted-foreground">已用:</span>
+                <span className="font-medium text-foreground">{bytes(ramPieData[0].value)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="size-2 rounded-[0.5px] bg-muted" />
+                <span className="text-muted-foreground">可用:</span>
+                <span className="font-medium text-foreground">{bytes(ramPieData[1].value)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 磁盘环形饼图 */}
+          <div className="flex flex-col rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
+            <div className="border-b border-border/40 pb-1.5 text-xs font-medium text-foreground">
+              存储空间分布比例
+            </div>
+            <div className="relative mt-2 flex h-32 items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip
+                    contentStyle={TOOLTIP_STYLE.contentStyle}
+                    formatter={(v) => bytes(Number(v))}
+                  />
+                  <Pie
+                    data={diskPieData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={36}
+                    outerRadius={50}
+                    stroke="var(--color-card)"
+                    strokeWidth={2}
+                  >
+                    {diskPieData.map((entry, index) => (
+                      <Cell key={`disk-cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="font-mono text-sm font-bold text-foreground">
+                  {currentDiskPct.toFixed(0)}%
+                </span>
+                <span className="text-[9px] text-muted-foreground">占用比例</span>
+              </div>
+            </div>
+            <div className="mt-1 flex items-center justify-around border-t border-border/30 pt-2 text-[11px] font-mono">
+              <div className="flex items-center gap-1.5">
+                <span className="size-2 rounded-[0.5px] bg-chart-2" />
+                <span className="text-muted-foreground">已用:</span>
+                <span className="font-medium text-foreground">{bytes(diskPieData[0].value)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="size-2 rounded-[0.5px] bg-muted" />
+                <span className="text-muted-foreground">剩余:</span>
+                <span className="font-medium text-foreground">{bytes(diskPieData[1].value)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 流量上下行比例饼图 */}
+          <div className="flex flex-col rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs sm:col-span-2 lg:col-span-1">
+            <div className="border-b border-border/40 pb-1.5 text-xs font-medium text-foreground">
+              网络入出流量份额
+            </div>
+            <div className="relative mt-2 flex h-32 items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip
+                    contentStyle={TOOLTIP_STYLE.contentStyle}
+                    formatter={(v) => bytes(Number(v))}
+                  />
+                  <Pie
+                    data={trafficPieData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={36}
+                    outerRadius={50}
+                    stroke="var(--color-card)"
+                    strokeWidth={2}
+                  >
+                    {trafficPieData.map((entry, index) => (
+                      <Cell key={`trf-cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="font-mono text-xs font-bold text-foreground">
+                  {trafficPieData[1].value >= trafficPieData[0].value ? "↑ 出网" : "↓ 入网"}
+                </span>
+                <span className="text-[9px] text-muted-foreground">流量主导</span>
+              </div>
+            </div>
+            <div className="mt-1 flex items-center justify-around border-t border-border/30 pt-2 text-[11px] font-mono">
+              <div className="flex items-center gap-1.5">
+                <span className="size-2 rounded-[0.5px] bg-ok" />
+                <span className="text-muted-foreground">下行:</span>
+                <span className="font-medium text-foreground">{bytes(trafficPieData[0].value)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="size-2 rounded-[0.5px] bg-chart-1" />
+                <span className="text-muted-foreground">上行:</span>
+                <span className="font-medium text-foreground">{bytes(trafficPieData[1].value)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. 负载时段活动热力图 (Heatmap) */}
+      {(viewMode === "overview" || viewMode === "heatmap") && (
+        <div className="rounded-[2px] border border-border/70 bg-card/60 p-3.5 shadow-2xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+              <Flame className="size-3.5 text-warn" />
+              <span>时段负荷活动热力矩阵 (24-Bucket Activity Heatmap)</span>
+            </div>
+            <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
+              <span>低负荷 (0%)</span>
+              <div className="flex items-center gap-0.5">
+                <span className="size-2.5 rounded-[1px] bg-muted/60" />
+                <span className="size-2.5 rounded-[1px] bg-emerald-500/30" />
+                <span className="size-2.5 rounded-[1px] bg-sky-500/40" />
+                <span className="size-2.5 rounded-[1px] bg-amber-500/50" />
+                <span className="size-2.5 rounded-[1px] bg-rose-500/70" />
+              </div>
+              <span>过载 (100%)</span>
+            </div>
+          </div>
+
+          {/* 热力格子矩阵 */}
+          <div className="mt-3 grid grid-cols-6 gap-1 sm:grid-cols-12 md:grid-cols-24">
+            {heatmapBuckets.map((bucket) => {
+              const cpu = bucket.avgCpu
+              // 根据 CPU 负荷计算阶梯背景色
+              let bgStyle = "bg-muted/50 border-border/30 text-muted-foreground"
+              if (cpu > 80) bgStyle = "bg-rose-500/75 border-rose-500 text-white font-bold"
+              else if (cpu > 60) bgStyle = "bg-amber-500/60 border-amber-500/80 text-foreground font-semibold"
+              else if (cpu > 35) bgStyle = "bg-sky-500/45 border-sky-500/60 text-foreground"
+              else if (cpu > 15) bgStyle = "bg-emerald-500/35 border-emerald-500/50 text-foreground"
+
+              return (
+                <div
+                  key={`heat-${bucket.index}`}
+                  className={cn(
+                    "flex flex-col items-center justify-center rounded-[1px] border p-1 text-center cursor-pointer transition-all hover:scale-105 hover:z-10",
+                    bgStyle
+                  )}
+                  onMouseEnter={() => setHoveredHeatCell(bucket)}
+                  onMouseLeave={() => setHoveredHeatCell(null)}
+                >
+                  <span className="text-[9px] font-mono opacity-80">{bucket.label}</span>
+                  <span className="text-[10px] font-mono font-medium">
+                    {cpu < 1 ? "<1" : cpu.toFixed(0)}%
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* 悬停单元格详情提示条 */}
+          {hoveredHeatCell ? (
+            <div className="mt-2.5 flex flex-wrap items-center justify-between rounded-[1px] border border-border/60 bg-muted/40 px-3 py-1.5 text-xs text-foreground font-mono animate-fade-in">
+              <span className="font-semibold text-primary">
+                时段：{hoveredHeatCell.label}
+              </span>
+              <span>平均 CPU：{hoveredHeatCell.avgCpu.toFixed(1)}%</span>
+              <span>CPU 峰值：{hoveredHeatCell.maxCpu.toFixed(1)}%</span>
+              <span>内存：{bytes(hoveredHeatCell.memUsed)}</span>
+              <span>
+                速率：↓ {rate(hoveredHeatCell.rxRate)} · ↑ {rate(hoveredHeatCell.txRate)}
+              </span>
+            </div>
+          ) : (
+            <div className="mt-2 text-center text-[11px] text-muted-foreground font-mono opacity-70">
+              鼠标悬停热力方块查看时段 CPU 峰值、内存使用与流量详情
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 4. 时序曲线走势图（CPU、内存、网络对数速率、硬盘） */}
+      {(viewMode === "overview" || viewMode === "trends") && (
+        <div className="space-y-4 pt-1">
+          {/* CPU 曲线 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
+              <span className="flex items-center gap-1.5">
+                <Cpu className="size-3.5 text-primary" />
+                <span>CPU 核心使用率走势</span>
+              </span>
+              <span className="font-mono text-[11px] font-normal text-muted-foreground">
+                当前: {currentCpuPct.toFixed(1)}% · 均值: {stats.avgCpu.toFixed(1)}% · 峰值: {stats.maxCpu.toFixed(1)}%
+              </span>
+            </div>
+            <div className="mt-2 h-40 w-full text-muted-foreground">
+              <ResponsiveContainer>
+                <AreaChart data={chartRows}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+                  <XAxis {...timeAxis(chartRows)} />
+                  <YAxis {...axes.cpu} unit="%" {...VALUE_AXIS} />
+                  <Tooltip {...TOOLTIP_STYLE} formatter={(v) => [`${Number(v).toFixed(1)}%`, "CPU 负荷"]} />
+                  <Area
+                    dataKey="cpu"
+                    stroke="var(--color-primary)"
+                    fill="var(--color-primary)"
+                    fillOpacity={0.16}
+                    {...RESOURCE_SERIES}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* 内存走势曲线 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
+              <span className="flex items-center gap-1.5">
+                <Layers className="size-3.5 text-primary" />
+                <span>物理内存使用趋势（上限 {bytes(node.mem_total)}）</span>
+              </span>
+              <span className="font-mono text-[11px] font-normal text-muted-foreground">
+                当前: {bytes(m ? m.mem_used : stats.avgMem)} ({currentMemPct.toFixed(1)}%)
+              </span>
+            </div>
+            <div className="mt-2 h-40 w-full text-muted-foreground">
+              <ResponsiveContainer>
+                <AreaChart data={chartRows}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+                  <XAxis {...timeAxis(chartRows)} />
+                  <YAxis
+                    domain={[0, node.mem_total]}
+                    ticks={quarters(node.mem_total)}
+                    tickFormatter={axisBytes}
+                    {...VALUE_AXIS}
+                  />
+                  <Tooltip {...TOOLTIP_STYLE} formatter={(v) => bytes(Number(v))} />
+                  <Area
+                    dataKey="mem_used"
+                    name="物理内存"
+                    stroke="var(--color-chart-2)"
+                    fill="var(--color-chart-2)"
+                    fillOpacity={0.16}
+                    {...RESOURCE_SERIES}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* 网络速率对数走势 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
+              <span className="flex items-center gap-1.5">
+                <Activity className="size-3.5 text-primary" />
+                <span>网络传输速率（对数刻度 · 含峰值带）</span>
+              </span>
+              <span className="font-mono text-[11px] font-normal text-muted-foreground">
+                {peak ? `峰值: ↓ ${rate(peak.rx)} · ↑ ${rate(peak.tx)}` : `均值: ↓ ${rate(stats.avgRx)} · ↑ ${rate(stats.avgTx)}`}
+              </span>
+            </div>
+            <div className="mt-2 h-40 w-full text-muted-foreground">
+              <ResponsiveContainer>
+                <ComposedChart data={chartRows}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+                  <XAxis {...timeAxis(chartRows)} />
+                  <YAxis scale="log" {...axes.rate} tickFormatter={axisBytes} unit="/s" {...VALUE_AXIS} />
+                  <Tooltip
+                    {...TOOLTIP_STYLE}
+                    formatter={(_, name, item) => {
+                      const mean = item?.payload?.[`net_${item.dataKey}`]
+                      const top = item?.payload?.[`net_${item.dataKey}_max`]
+                      return [top === undefined ? rate(mean) : `均值 ${rate(mean)} · 峰值 ${rate(top)}`, name]
+                    }}
+                  />
+                  {[
+                    { key: "rx", stroke: "var(--color-ok)" },
+                    { key: "tx", stroke: "var(--color-chart-1)" },
+                  ].map((s) => (
+                    <Area
+                      key={s.key}
+                      dataKey={`${s.key}_band`}
+                      stroke={s.stroke}
+                      strokeWidth={1}
+                      strokeDasharray="2 2"
+                      fill={s.stroke}
+                      fillOpacity={0.16}
+                      isAnimationActive={false}
+                      tooltipType="none"
+                      legendType="none"
+                    />
+                  ))}
+                  <Line dataKey="rx" name="下行入站" stroke="var(--color-ok)" {...RESOURCE_SERIES} />
+                  <Line dataKey="tx" name="上行出站" stroke="var(--color-chart-1)" {...RESOURCE_SERIES} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* 硬盘空间走势 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
+              <span className="flex items-center gap-1.5">
+                <HardDrive className="size-3.5 text-primary" />
+                <span>系统磁盘容量（上限 {bytes(node.disk_total)}）</span>
+              </span>
+              <span className="font-mono text-[11px] font-normal text-muted-foreground">
+                当前已用: {bytes(m ? m.disk_used : 0)} ({currentDiskPct.toFixed(1)}%)
+              </span>
+            </div>
+            <div className="mt-2 h-40 w-full text-muted-foreground">
+              <ResponsiveContainer>
+                <AreaChart data={chartRows}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+                  <XAxis {...timeAxis(chartRows)} />
+                  <YAxis
+                    domain={[0, node.disk_total]}
+                    ticks={quarters(node.disk_total)}
+                    tickFormatter={axisBytes}
+                    {...VALUE_AXIS}
+                  />
+                  <Tooltip {...TOOLTIP_STYLE} formatter={(v) => bytes(Number(v))} />
+                  <Area
+                    dataKey="disk_used"
+                    name="磁盘存储"
+                    stroke="var(--color-chart-2)"
+                    fill="var(--color-chart-2)"
+                    fillOpacity={0.16}
+                    {...RESOURCE_SERIES}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

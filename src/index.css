@@ -202,4 +202,46 @@
   animation: radarSweepGlow 2.4s ease-in-out infinite;
 }
 
+/* ==========================================================================
+   Recharts Brush 时间滑块工控暗黑模式与微倒角美化
+   彻底根治默认白色大底色块刺眼的问题，自动适配深浅色背景与发光指针
+   ========================================================================== */
+.recharts-brush {
+  user-select: none;
+}
+
+.recharts-brush .recharts-brush-slide {
+  fill: var(--color-muted) !important;
+  fill-opacity: 0.55 !important;
+  stroke: var(--color-border) !important;
+  stroke-width: 1px !important;
+  rx: 2px !important;
+}
+
+.recharts-brush .recharts-brush-background {
+  fill: var(--color-card) !important;
+  fill-opacity: 0.8 !important;
+  stroke: var(--color-border) !important;
+  stroke-width: 1px !important;
+  rx: 2px !important;
+}
+
+.recharts-brush .recharts-brush-traveller rect {
+  fill: var(--color-secondary) !important;
+  stroke: var(--color-border) !important;
+  stroke-width: 1.2px !important;
+  rx: 1px !important;
+}
+
+.recharts-brush .recharts-brush-traveller path {
+  stroke: var(--color-foreground) !important;
+  stroke-width: 1.2px !important;
+}
+
+.recharts-brush-texts text {
+  fill: var(--color-muted-foreground) !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 10px !important;
+}
+
 
