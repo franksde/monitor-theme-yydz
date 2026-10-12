@@ -70,7 +70,7 @@ export type ResourceChartsProps = {
 // 视图模式定义
 type ViewMode = "overview" | "trends" | "heatmap" | "donut"
 
-const AXIS = { stroke: "currentColor", fontSize: 11, tickLine: false, axisLine: false }
+const AXIS = { stroke: "currentColor", fontSize: 12, tickLine: false, axisLine: false }
 const VALUE_AXIS = { ...AXIS, width: 68, interval: 0 }
 const SERIES = { dot: false as const, strokeWidth: 1.5, isAnimationActive: false }
 const RESOURCE_SERIES = {
@@ -281,7 +281,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Activity className="size-3.5 text-primary" />
           <span className="font-semibold text-foreground">主机资源分析测控</span>
-          <span className="text-[11px] opacity-70">
+          <span className="text-xs text-muted-foreground font-medium">
             · {metricRows.length} 采样点 · 涵盖最近 {hours} 小时
           </span>
         </div>
@@ -373,7 +373,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                 style={{ width: `${Math.min(100, Math.max(0, currentCpuPct))}%` }}
               />
             </div>
-            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+            <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
               <span>均值 {stats.avgCpu.toFixed(1)}%</span>
               <span>峰值 {stats.maxCpu.toFixed(1)}%</span>
             </div>
@@ -396,7 +396,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                 style={{ width: `${Math.min(100, Math.max(0, currentMemPct))}%` }}
               />
             </div>
-            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+            <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
               <span>已用 {bytes(m ? m.mem_used : stats.avgMem)}</span>
               <span>总量 {bytes(node.mem_total)}</span>
             </div>
@@ -422,7 +422,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                 style={{ width: `${Math.min(100, Math.max(0, currentDiskPct))}%` }}
               />
             </div>
-            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+            <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
               <span>已用 {bytes(m ? m.disk_used : 0)}</span>
               <span>总量 {bytes(node.disk_total)}</span>
             </div>
@@ -447,7 +447,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                 }}
               />
             </div>
-            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+            <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
               <span>↓ {rate(m ? m.net_rx : stats.avgRx)}</span>
               <span>↑ {rate(m ? m.net_tx : stats.avgTx)}</span>
             </div>
@@ -489,19 +489,19 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                 <span className="font-mono text-sm font-bold text-foreground">
                   {currentMemPct.toFixed(0)}%
                 </span>
-                <span className="text-[9px] text-muted-foreground">已用占比</span>
+                <span className="text-xs text-muted-foreground font-medium">已用占比</span>
               </div>
             </div>
-            <div className="mt-1 flex items-center justify-around border-t border-border/30 pt-2 text-[11px] font-mono">
+            <div className="mt-1 flex items-center justify-around border-t border-border/30 pt-2 text-xs font-mono font-medium">
               <div className="flex items-center gap-1.5">
                 <span className="size-2 rounded-[0.5px] bg-primary" />
                 <span className="text-muted-foreground">已用:</span>
-                <span className="font-medium text-foreground">{bytes(ramPieData[0].value)}</span>
+                <span className="font-semibold text-foreground">{bytes(ramPieData[0].value)}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="size-2 rounded-[0.5px] bg-muted" />
                 <span className="text-muted-foreground">可用:</span>
-                <span className="font-medium text-foreground">{bytes(ramPieData[1].value)}</span>
+                <span className="font-semibold text-foreground">{bytes(ramPieData[1].value)}</span>
               </div>
             </div>
           </div>
@@ -537,19 +537,19 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                 <span className="font-mono text-sm font-bold text-foreground">
                   {currentDiskPct.toFixed(0)}%
                 </span>
-                <span className="text-[9px] text-muted-foreground">占用比例</span>
+                <span className="text-xs text-muted-foreground font-medium">占用比例</span>
               </div>
             </div>
-            <div className="mt-1 flex items-center justify-around border-t border-border/30 pt-2 text-[11px] font-mono">
+            <div className="mt-1 flex items-center justify-around border-t border-border/30 pt-2 text-xs font-mono font-medium">
               <div className="flex items-center gap-1.5">
                 <span className="size-2 rounded-[0.5px] bg-chart-2" />
                 <span className="text-muted-foreground">已用:</span>
-                <span className="font-medium text-foreground">{bytes(diskPieData[0].value)}</span>
+                <span className="font-semibold text-foreground">{bytes(diskPieData[0].value)}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="size-2 rounded-[0.5px] bg-muted" />
                 <span className="text-muted-foreground">剩余:</span>
-                <span className="font-medium text-foreground">{bytes(diskPieData[1].value)}</span>
+                <span className="font-semibold text-foreground">{bytes(diskPieData[1].value)}</span>
               </div>
             </div>
           </div>
@@ -585,19 +585,19 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                 <span className="font-mono text-xs font-bold text-foreground">
                   {trafficPieData[1].value >= trafficPieData[0].value ? "↑ 出网" : "↓ 入网"}
                 </span>
-                <span className="text-[9px] text-muted-foreground">流量主导</span>
+                <span className="text-xs text-muted-foreground font-medium">流量主导</span>
               </div>
             </div>
-            <div className="mt-1 flex items-center justify-around border-t border-border/30 pt-2 text-[11px] font-mono">
+            <div className="mt-1 flex items-center justify-around border-t border-border/30 pt-2 text-xs font-mono font-medium">
               <div className="flex items-center gap-1.5">
                 <span className="size-2 rounded-[0.5px] bg-ok" />
                 <span className="text-muted-foreground">下行:</span>
-                <span className="font-medium text-foreground">{bytes(trafficPieData[0].value)}</span>
+                <span className="font-semibold text-foreground">{bytes(trafficPieData[0].value)}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="size-2 rounded-[0.5px] bg-chart-1" />
                 <span className="text-muted-foreground">上行:</span>
-                <span className="font-medium text-foreground">{bytes(trafficPieData[1].value)}</span>
+                <span className="font-semibold text-foreground">{bytes(trafficPieData[1].value)}</span>
               </div>
             </div>
           </div>
@@ -612,7 +612,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
               <Flame className="size-3.5 text-warn" />
               <span>时段负荷活动热力矩阵 (24-Bucket Activity Heatmap)</span>
             </div>
-            <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
+            <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
               <span>低负荷 (0%)</span>
               <div className="flex items-center gap-0.5">
                 <span className="size-2.5 rounded-[1px] bg-muted/60" />
@@ -633,21 +633,21 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
               let bgStyle = "bg-muted/50 border-border/30 text-muted-foreground"
               if (cpu > 80) bgStyle = "bg-rose-500/75 border-rose-500 text-white font-bold"
               else if (cpu > 60) bgStyle = "bg-amber-500/60 border-amber-500/80 text-foreground font-semibold"
-              else if (cpu > 35) bgStyle = "bg-sky-500/45 border-sky-500/60 text-foreground"
+              else if (cpu > 35) bgStyle = "bg-sky-500/45 border-sky-500/60 text-foreground font-medium"
               else if (cpu > 15) bgStyle = "bg-emerald-500/35 border-emerald-500/50 text-foreground"
 
               return (
                 <div
                   key={`heat-${bucket.index}`}
                   className={cn(
-                    "flex flex-col items-center justify-center rounded-[1px] border p-1 text-center cursor-pointer transition-all hover:scale-105 hover:z-10",
+                    "flex flex-col items-center justify-center rounded-[1px] border py-1.5 px-0.5 text-center cursor-pointer transition-all hover:scale-105 hover:z-10",
                     bgStyle
                   )}
                   onMouseEnter={() => setHoveredHeatCell(bucket)}
                   onMouseLeave={() => setHoveredHeatCell(null)}
                 >
-                  <span className="text-[9px] font-mono opacity-80">{bucket.label}</span>
-                  <span className="text-[10px] font-mono font-medium">
+                  <span className="text-[10px] font-mono leading-tight opacity-90">{bucket.label}</span>
+                  <span className="text-xs font-mono font-bold leading-tight mt-0.5">
                     {cpu < 1 ? "<1" : cpu.toFixed(0)}%
                   </span>
                 </div>
@@ -669,7 +669,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
               </span>
             </div>
           ) : (
-            <div className="mt-2 text-center text-[11px] text-muted-foreground font-mono opacity-70">
+            <div className="mt-2 text-center text-xs text-muted-foreground font-mono font-medium">
               鼠标悬停热力方块查看时段 CPU 峰值、内存使用与流量详情
             </div>
           )}
@@ -686,7 +686,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                 <Cpu className="size-3.5 text-primary" />
                 <span>CPU 核心使用率走势</span>
               </span>
-              <span className="font-mono text-[11px] font-normal text-muted-foreground">
+              <span className="font-mono text-xs font-normal text-muted-foreground">
                 当前: {currentCpuPct.toFixed(1)}% · 均值: {stats.avgCpu.toFixed(1)}% · 峰值: {stats.maxCpu.toFixed(1)}%
               </span>
             </div>
@@ -716,7 +716,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                 <Layers className="size-3.5 text-primary" />
                 <span>物理内存使用趋势（上限 {bytes(node.mem_total)}）</span>
               </span>
-              <span className="font-mono text-[11px] font-normal text-muted-foreground">
+              <span className="font-mono text-xs font-normal text-muted-foreground">
                 当前: {bytes(m ? m.mem_used : stats.avgMem)} ({currentMemPct.toFixed(1)}%)
               </span>
             </div>
@@ -752,7 +752,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                 <Activity className="size-3.5 text-primary" />
                 <span>网络传输速率（对数刻度 · 含峰值带）</span>
               </span>
-              <span className="font-mono text-[11px] font-normal text-muted-foreground">
+              <span className="font-mono text-xs font-normal text-muted-foreground">
                 {peak ? `峰值: ↓ ${rate(peak.rx)} · ↑ ${rate(peak.tx)}` : `均值: ↓ ${rate(stats.avgRx)} · ↑ ${rate(stats.avgTx)}`}
               </span>
             </div>
@@ -801,7 +801,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                 <HardDrive className="size-3.5 text-primary" />
                 <span>系统磁盘容量（上限 {bytes(node.disk_total)}）</span>
               </span>
-              <span className="font-mono text-[11px] font-normal text-muted-foreground">
+              <span className="font-mono text-xs font-normal text-muted-foreground">
                 当前已用: {bytes(m ? m.disk_used : 0)} ({currentDiskPct.toFixed(1)}%)
               </span>
             </div>

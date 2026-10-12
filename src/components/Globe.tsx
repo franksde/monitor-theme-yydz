@@ -170,11 +170,11 @@ export function Globe({
               <h3 className="text-sm font-semibold tracking-tight text-foreground">
                 全球节点平面拓扑分布
               </h3>
-              <Badge className="h-4 rounded-[2px] border border-border/70 bg-muted/30 px-1 text-[9px] uppercase tracking-wider text-muted-foreground">
+              <Badge className="h-4.5 rounded-[2px] border border-border/70 bg-muted/30 px-1.5 text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
                 FLAT MATRIX
               </Badge>
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               全球视野一览无余 · 接入 {totalPlaced} 台 · 在线 {onlineCount} 台 · 覆盖 {regions.length} 个地区
             </p>
           </div>
@@ -376,7 +376,7 @@ export function Globe({
           </svg>
 
           {/* 交互提示微标签 */}
-          <div className="pointer-events-none absolute bottom-3 left-4 text-[10px] font-mono text-muted-foreground opacity-60">
+          <div className="pointer-events-none absolute bottom-3 left-4 text-xs font-mono text-muted-foreground">
             悬停亮点查看地区节点 · 点击亮点筛选地区
           </div>
 
@@ -414,7 +414,7 @@ export function Globe({
                 <span className="truncate">
                   {activeCard.region.city}, {activeCard.region.country}
                 </span>
-                <span className="ml-auto text-[10px] font-mono text-muted-foreground shrink-0">
+                <span className="ml-auto text-xs font-mono text-muted-foreground shrink-0 font-medium">
                   共 {activeCard.region.total} 台
                 </span>
               </div>
@@ -431,7 +431,7 @@ export function Globe({
                     className="group flex items-center justify-between gap-3 rounded-[2px] px-1.5 py-1 text-xs hover:bg-muted/70 cursor-pointer transition-colors"
                     title="点击查看此节点监控指标"
                   >
-                    <span className="truncate font-mono text-[11px] text-foreground group-hover:text-primary transition-colors">
+                    <span className="truncate font-mono text-xs font-medium text-foreground group-hover:text-primary transition-colors">
                       {node.name}
                     </span>
                     <span
@@ -458,13 +458,13 @@ export function Globe({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-5 rounded-[2px] px-1 text-[11px] text-muted-foreground hover:text-foreground"
+                className="h-5 rounded-[2px] px-1 text-xs text-muted-foreground hover:text-foreground"
                 onClick={() => onSelectRegion(null)}
               >
                 清除筛选
               </Button>
             ) : (
-              <span className="text-[10px] text-muted-foreground font-mono">
+              <span className="text-xs text-muted-foreground font-mono">
                 共 {regions.length} 个区域
               </span>
             )}
@@ -501,12 +501,12 @@ export function Globe({
                       <span className="truncate text-xs font-medium text-foreground">
                         {reg.city}
                       </span>
-                      <span className="text-[10px] opacity-75 font-mono">
+                      <span className="text-xs font-mono text-muted-foreground">
                         ({reg.country})
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1 text-[11px] font-mono shrink-0">
+                    <div className="flex items-center gap-1 text-xs font-mono font-medium shrink-0">
                       <span className={cn(reg.online === reg.total ? "text-online" : "text-warn")}>
                         {reg.online}/{reg.total}
                       </span>

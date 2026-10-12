@@ -125,7 +125,7 @@ export function LatencySection({
   if (loading && rows.length === 0) {
     return (
       <div className="mt-3.5 space-y-1.5 border-t border-border/50 pt-2.5">
-        <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
           <span className="h-2.5 w-12 rounded-[1px] bg-muted/40 animate-pulse" />
           <span className="h-2.5 w-16 rounded-[1px] bg-muted/40 animate-pulse" />
           <span className="h-2.5 w-8 rounded-[1px] bg-muted/40 animate-pulse" />
@@ -139,7 +139,7 @@ export function LatencySection({
 
   return (
     <div className="mt-3.5 space-y-1.5 border-t border-border/60 pt-2.5">
-      <div className="flex items-center justify-between text-[10px] uppercase font-mono tracking-wider text-muted-foreground/80 pb-0.5">
+      <div className="flex items-center justify-between text-xs font-mono font-medium text-muted-foreground pb-0.5">
         <span>网络延迟</span>
         <span>1H 走势 · 丢包</span>
       </div>
@@ -156,7 +156,7 @@ export function LatencySection({
               : grade === "warn"
                 ? "text-warn font-medium"
                 : grade === "down"
-                  ? "text-muted-foreground/60"
+                  ? "text-muted-foreground"
                   : "text-online font-medium"
 
           const lossClass =
@@ -164,7 +164,7 @@ export function LatencySection({
               ? "text-destructive font-semibold"
               : loss > 0
                 ? "text-warn font-medium"
-                : "text-muted-foreground/60"
+                : "text-muted-foreground"
 
           return (
             <div
@@ -173,14 +173,14 @@ export function LatencySection({
             >
               {/* 线路名称 */}
               <span
-                className="w-14 shrink-0 truncate text-[11px] text-muted-foreground"
+                className="w-14 shrink-0 truncate text-xs text-muted-foreground font-medium"
                 title={probe.name}
               >
                 {probe.name}
               </span>
 
               {/* 当前最新延迟 */}
-              <span className={cn("tnum w-13 shrink-0 text-right text-[11px]", msClass)}>
+              <span className={cn("tnum w-13 shrink-0 text-right text-xs", msClass)}>
                 {ms === null ? "超时" : `${ms} ms`}
               </span>
 
@@ -188,7 +188,7 @@ export function LatencySection({
               <LatencySparkline points={probe.points} grade={grade} />
 
               {/* 丢包率 */}
-              <span className={cn("tnum w-9 shrink-0 text-right text-[11px]", lossClass)}>
+              <span className={cn("tnum w-9 shrink-0 text-right text-xs", lossClass)}>
                 {loss > 0 ? `${loss.toFixed(1)}%` : "0.0%"}
               </span>
             </div>

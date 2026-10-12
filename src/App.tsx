@@ -301,7 +301,7 @@ function NodeList({
                 }}
               >
                 <span>{label}</span>
-                <span className="tnum ml-1 rounded-[1px] bg-muted/60 px-1 py-0.2 text-[10px] text-muted-foreground">
+                <span className="tnum ml-1 rounded-[1px] bg-muted/60 px-1.5 py-0.5 text-xs font-mono text-muted-foreground font-medium">
                   {count}
                 </span>
               </Button>

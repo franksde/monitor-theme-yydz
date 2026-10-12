@@ -233,12 +233,12 @@ export function NodeCard({
               <ArrowUp className="size-3 text-muted-foreground" />
               {m ? rate(m.net_tx) : "—"}
             </span>
-            <span className="tnum inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-              <ArrowDown className="size-3 opacity-70" />
+            <span className="tnum inline-flex items-center gap-1 text-xs text-muted-foreground font-mono">
+              <ArrowDown className="size-3 opacity-80" />
               {bytes(node.total_rx)}
             </span>
-            <span className="tnum inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-              <ArrowUp className="size-3 opacity-70" />
+            <span className="tnum inline-flex items-center gap-1 text-xs text-muted-foreground font-mono">
+              <ArrowUp className="size-3 opacity-80" />
               {bytes(node.total_tx)}
             </span>
           </div>

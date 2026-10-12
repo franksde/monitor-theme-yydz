@@ -69,13 +69,13 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
           <Status node={node} />
 
           {node.group && (
-            <Badge className="rounded-[2px] text-[11px] font-normal bg-secondary text-secondary-foreground border-transparent">
+            <Badge className="rounded-[2px] text-xs font-medium bg-secondary text-secondary-foreground border-transparent">
               {node.group}
             </Badge>
           )}
 
           {node.agent_version && (
-            <Badge className="rounded-[2px] font-mono text-[10px] text-muted-foreground border-border/70 bg-transparent">
+            <Badge className="rounded-[2px] font-mono text-xs text-foreground/80 border-border/70 bg-transparent">
               v{node.agent_version}
             </Badge>
           )}
@@ -92,14 +92,14 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
           {m && m.uptime > 0 && (
             <div className="flex items-center gap-1.5 rounded-[2px] border border-border/60 bg-muted/40 px-2 py-1">
               <Clock className="size-3 text-muted-foreground/80" />
-              <span className="font-mono text-[11px]">{uptime(m.uptime)}</span>
+              <span className="font-mono text-xs font-medium text-foreground">{uptime(m.uptime)}</span>
             </div>
           )}
 
           {m && (
             <div className="flex items-center gap-1.5 rounded-[2px] border border-border/60 bg-muted/40 px-2 py-1">
               <Activity className="size-3 text-muted-foreground/80" />
-              <span className="font-mono text-[11px]">
+              <span className="font-mono text-xs font-medium text-foreground">
                 负载 {m.load.map((l) => l.toFixed(2)).join(" / ")}
               </span>
             </div>
@@ -108,7 +108,7 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
           {m && (
             <div className="flex items-center gap-1.5 rounded-[2px] border border-border/60 bg-muted/40 px-2 py-1">
               <ArrowUpDown className="size-3 text-muted-foreground/80" />
-              <span className="font-mono text-[11px]">
+              <span className="font-mono text-xs font-medium text-foreground">
                 ↓ {rate(m.net_rx)} · ↑ {rate(m.net_tx)}
               </span>
             </div>
@@ -259,9 +259,9 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
                 {daysLeft !== null && daysLeft <= 15 && (
                   <Badge
                     className={cn(
-                      "h-4 px-1 text-[9px] rounded-[1px]",
+                      "h-4.5 px-1.5 text-[11px] font-medium rounded-[1px]",
                       daysLeft <= 3
-                        ? "border-destructive/40 bg-destructive/15 text-destructive"
+                        ? "border-destructive/40 bg-destructive/15 text-destructive font-semibold"
                         : "border-border/60 bg-muted/60 text-muted-foreground"
                     )}
                   >

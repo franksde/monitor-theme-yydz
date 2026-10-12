@@ -57,7 +57,7 @@ export type LatencyDashboardProps = {
 
 type ViewMode = "combined" | "split" | "ranking"
 
-const AXIS = { stroke: "currentColor", fontSize: 11, tickLine: false, axisLine: false }
+const AXIS = { stroke: "currentColor", fontSize: 12, tickLine: false, axisLine: false }
 const SERIES = { dot: false as const, strokeWidth: 1.5, isAnimationActive: false }
 
 // 工控高对比度调色盘（多线路各具辨识度，同时兼具深浅色模式表现力）
@@ -244,7 +244,7 @@ export function LatencyDashboard({
         <div className="flex items-center gap-2">
           <Wifi className="size-4 text-primary" />
           <span className="font-semibold text-foreground text-xs">网络延迟拓扑测控</span>
-          <Badge className="h-4 rounded-[1px] px-1 text-[9px] uppercase tracking-wider text-muted-foreground border-border/60">
+          <Badge className="h-4.5 rounded-[1px] px-1.5 text-[11px] font-mono text-muted-foreground border-border/60">
             {pingSeries.length} 条测试线路
           </Badge>
         </div>
@@ -358,11 +358,11 @@ export function LatencyDashboard({
 
                 <div className="flex items-center gap-1 shrink-0">
                   {s.loss > 0 && (
-                    <Badge className="h-4 px-1 text-[9px] rounded-[1px] font-mono border-destructive/40 bg-destructive/15 text-destructive">
+                    <Badge className="h-4.5 px-1.5 text-[11px] rounded-[1px] font-mono border-destructive/40 bg-destructive/15 text-destructive font-semibold">
                       丢 {s.loss < 1 ? "<1" : Math.round(s.loss)}%
                     </Badge>
                   )}
-                  <span className={cn("text-[10px] font-mono font-medium", s.tier.colorClass)}>
+                  <span className={cn("text-xs font-mono font-medium", s.tier.colorClass)}>
                     {s.tier.label}
                   </span>
                 </div>
@@ -374,12 +374,12 @@ export function LatencyDashboard({
                   <span className="font-mono text-xl font-bold tracking-tight text-foreground">
                     {s.latest !== null ? Math.round(s.latest) : "—"}
                   </span>
-                  <span className="ml-1 text-[10px] text-muted-foreground font-mono">ms</span>
+                  <span className="ml-1 text-xs text-muted-foreground font-mono">ms</span>
                 </div>
 
                 {/* 纯 SVG 微型火花线趋势图 */}
                 {spark.length > 1 && (
-                  <svg width={sparkW} height={sparkH} className="overflow-visible opacity-75">
+                  <svg width={sparkW} height={sparkH} className="overflow-visible opacity-85">
                     <polyline
                       fill="none"
                       stroke={s.style.stroke}
@@ -394,8 +394,8 @@ export function LatencyDashboard({
               </div>
 
               {/* 卡片底部：极值统计与独占聚焦快捷按钮 */}
-              <div className="flex items-center justify-between border-t border-border/30 pt-1.5 text-[10px] font-mono text-muted-foreground">
-                <span>
+              <div className="flex items-center justify-between border-t border-border/30 pt-1.5 text-xs font-mono text-muted-foreground">
+                <span className="font-medium">
                   均 {Math.round(s.avg)} · 极 {Math.round(s.min)}-{Math.round(s.max)}
                 </span>
                 <button
@@ -405,8 +405,8 @@ export function LatencyDashboard({
                     handleSolo(s.id)
                   }}
                   className={cn(
-                    "rounded-[1px] px-1 py-0.2 hover:bg-muted/80 transition-colors",
-                    isSolo ? "bg-primary text-primary-foreground font-semibold" : "opacity-70 hover:opacity-100"
+                    "rounded-[1px] px-1.5 py-0.5 text-xs transition-colors font-medium",
+                    isSolo ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
                   )}
                   title={isSolo ? "取消单线聚焦" : "单线聚焦 (Solo)"}
                 >
@@ -428,7 +428,7 @@ export function LatencyDashboard({
               <TrendingUp className="size-3.5 text-primary" />
               <span>多线路时序延迟对比（已选 {shownProbes.length}/{pingSeries.length} 线）</span>
             </span>
-            <span className="text-[11px] font-mono font-normal text-muted-foreground">
+            <span className="text-xs font-mono font-normal text-muted-foreground">
               拖动底部滑块可缩放时间区间
             </span>
           </div>
@@ -537,7 +537,7 @@ export function LatencyDashboard({
                     />
                     <span className="font-semibold text-foreground truncate">{s.name}</span>
                   </div>
-                  <div className="font-mono text-[11px] text-muted-foreground">
+                  <div className="font-mono text-xs text-muted-foreground font-medium">
                     最新: {s.latest !== null ? Math.round(s.latest) : "—"}ms · 均值: {Math.round(s.avg)}ms
                   </div>
                 </div>
@@ -586,7 +586,7 @@ export function LatencyDashboard({
               <BarChart2 className="size-3.5 text-primary" />
               <span>各线路平均响应延迟梯队对比</span>
             </span>
-            <span className="text-[11px] font-mono font-normal text-muted-foreground">
+            <span className="text-xs font-mono font-normal text-muted-foreground">
               按平均延迟从快到慢阶梯排列
             </span>
           </div>

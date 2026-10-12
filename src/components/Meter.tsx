@@ -27,7 +27,7 @@ export function Meter({ label, pct, foot, empty = "—" }: Props) {
         />
       </div>
       {/* 底部详细数值 */}
-      <div className="tnum mt-1.5 truncate text-[11px] text-muted-foreground">{foot}</div>
+      <div className="tnum mt-1.5 truncate text-xs text-muted-foreground font-mono">{foot}</div>
     </div>
   )
 }

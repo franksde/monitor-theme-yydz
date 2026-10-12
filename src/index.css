@@ -20,7 +20,7 @@
   --secondary: oklch(0.95 0 0);
   --secondary-foreground: oklch(0.14 0 0);
   --muted: oklch(0.94 0 0);
-  --muted-foreground: oklch(0.48 0 0);
+  --muted-foreground: oklch(0.38 0 0);
   --accent: oklch(0.94 0 0);
   --accent-foreground: oklch(0.14 0 0);
   --destructive: oklch(0.45 0.2 25);
@@ -52,7 +52,7 @@
   --secondary: oklch(0.22 0 0);
   --secondary-foreground: oklch(0.96 0 0);
   --muted: oklch(0.22 0 0);
-  --muted-foreground: oklch(0.65 0 0);
+  --muted-foreground: oklch(0.72 0 0);
   --accent: oklch(0.24 0 0);
   --accent-foreground: oklch(0.96 0 0);
   --destructive: oklch(0.65 0.22 25);
@@ -71,6 +71,8 @@
 }
 
 @theme inline {
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", "Noto Sans CJK SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Hack", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Noto Sans Mono CJK SC", monospace;
   --radius-sm: 1px;
   --radius-md: 2px;
   --radius-lg: 3px;
@@ -103,13 +105,21 @@
 
 @layer base {
   * { @apply border-border outline-ring/50; }
-  /* 固定滚动条槽位，防止详情页切换与内容抖动 */
+  /* 全局字体渲染平滑度与优化排版 */
   html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     scrollbar-gutter: stable;
     scroll-behavior: smooth;
   }
   body {
     @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     /* 细腻的工业精密网格点阵底纹（低透明度） */
     background-image: radial-gradient(circle at 1px 1px, oklch(0.5 0 0 / 4%) 1px, transparent 0);
     background-size: 24px 24px;
@@ -239,9 +249,10 @@
 }
 
 .recharts-brush-texts text {
-  fill: var(--color-muted-foreground) !important;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-  font-size: 10px !important;
+  fill: var(--color-foreground) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
 }
 
 
