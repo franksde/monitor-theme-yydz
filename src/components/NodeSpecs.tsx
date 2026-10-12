@@ -7,7 +7,8 @@
 
 import {
   Activity,
-  ArrowUpDown,
+  ArrowDown,
+  ArrowUp,
   Calendar,
   Clock,
   Cpu,
@@ -61,7 +62,7 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
       {/* 1. 顶部全景控制栏：国旗、节点名称、在线指示灯、Agent 版本、地理坐标与实时遥测指标胶囊 */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-[2px] border border-border/80 bg-card/80 p-3.5 shadow-2xs backdrop-blur-xs">
         {/* 左侧：主机标识与属性徽章 */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-2.5">
           <Country node={node} />
           <h2 className="truncate text-lg font-bold tracking-tight text-foreground" title={node.name}>
             {node.name}
@@ -88,31 +89,55 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
         </div>
 
         {/* 右侧：实时关键遥测指标胶囊（运行时长、负载、实时网络速率） */}
-        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-          {m && m.uptime > 0 && (
-            <div className="flex items-center gap-1.5 rounded-[2px] border border-border/60 bg-muted/40 px-2 py-1">
-              <Clock className="size-3 text-muted-foreground/80" />
-              <span className="font-mono text-xs font-medium text-foreground">{uptime(m.uptime)}</span>
+        {/* 采用恒定槽位宽度与等宽数字设计，彻底杜绝数据高频刷新时引起的抖动与折行跳跃 */}
+        <div className="flex flex-wrap items-center gap-2 text-xs shrink-0">
+          {/* 1. 运行时间胶囊 */}
+          <div
+            className="flex h-7 min-w-[144px] items-center justify-between gap-2 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border"
+            title="系统连续运行时间"
+          >
+            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
+              <Clock className="size-3 text-muted-foreground/80 shrink-0" />
+              <span>运行</span>
             </div>
-          )}
+            <span className="tnum font-mono text-xs font-medium text-foreground text-right min-w-[76px] shrink-0 whitespace-nowrap">
+              {m && m.uptime > 0 ? uptime(m.uptime) : "—"}
+            </span>
+          </div>
 
-          {m && (
-            <div className="flex items-center gap-1.5 rounded-[2px] border border-border/60 bg-muted/40 px-2 py-1">
-              <Activity className="size-3 text-muted-foreground/80" />
-              <span className="font-mono text-xs font-medium text-foreground">
-                负载 {m.load.map((l) => l.toFixed(2)).join(" / ")}
+          {/* 2. 系统负载胶囊 */}
+          <div
+            className="flex h-7 min-w-[200px] items-center justify-between gap-2 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border"
+            title="系统 1 / 5 / 15 分钟平均负载"
+          >
+            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
+              <Activity className="size-3 text-muted-foreground/80 shrink-0" />
+              <span>负载</span>
+            </div>
+            <span className="tnum font-mono text-xs font-medium text-foreground text-right min-w-[130px] shrink-0 whitespace-nowrap">
+              {m?.load ? m.load.map((l) => l.toFixed(2)).join(" / ") : "— / — / —"}
+            </span>
+          </div>
+
+          {/* 3. 实时网络吞吐胶囊：下行与上行分置固定宽度槽位，彻底消除数值变化推挤抖动 */}
+          <div
+            className="flex h-7 items-center gap-2 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border"
+            title="实时网络吞吐速率 (下行 / 上行)"
+          >
+            <div className="flex items-center gap-1 shrink-0">
+              <ArrowDown className="size-3 text-muted-foreground/80 shrink-0" />
+              <span className="tnum font-mono text-xs font-medium text-foreground text-right w-[70px] shrink-0 whitespace-nowrap">
+                {m ? rate(m.net_rx) : "0 B/s"}
               </span>
             </div>
-          )}
-
-          {m && (
-            <div className="flex items-center gap-1.5 rounded-[2px] border border-border/60 bg-muted/40 px-2 py-1">
-              <ArrowUpDown className="size-3 text-muted-foreground/80" />
-              <span className="font-mono text-xs font-medium text-foreground">
-                ↓ {rate(m.net_rx)} · ↑ {rate(m.net_tx)}
+            <span className="text-border/80 shrink-0 select-none">·</span>
+            <div className="flex items-center gap-1 shrink-0">
+              <ArrowUp className="size-3 text-muted-foreground/80 shrink-0" />
+              <span className="tnum font-mono text-xs font-medium text-foreground text-right w-[70px] shrink-0 whitespace-nowrap">
+                {m ? rate(m.net_tx) : "0 B/s"}
               </span>
             </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -218,19 +243,19 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
           <div className="divide-y divide-border/30 text-xs">
             <div className="flex items-center justify-between py-1.5">
               <span className="text-muted-foreground">实时速率</span>
-              <span className="font-mono font-medium text-foreground">
+              <span className="tnum font-mono font-medium text-foreground">
                 ↓ {rate(m?.net_rx ?? 0)} · ↑ {rate(m?.net_tx ?? 0)}
               </span>
             </div>
             <div className="flex items-center justify-between py-1.5">
               <span className="text-muted-foreground">今日流量</span>
-              <span className="font-mono font-medium text-foreground">
+              <span className="tnum font-mono font-medium text-foreground">
                 ↓ {bytes(node.day_rx)} · ↑ {bytes(node.day_tx)}
               </span>
             </div>
             <div className="flex items-center justify-between py-1.5">
               <span className="text-muted-foreground">本月用量</span>
-              <span className="font-mono font-medium text-foreground">
+              <span className="tnum font-mono font-medium text-foreground">
                 {trafficText}
               </span>
             </div>
