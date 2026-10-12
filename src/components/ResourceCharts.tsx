@@ -147,6 +147,8 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("overview")
   const [hoveredHeatCell, setHoveredHeatCell] = useState<{
     label: string
+    fullLabel: string
+    hasData: boolean
     avgCpu: number
     maxCpu: number
     memUsed: number
@@ -230,6 +232,52 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
     }
   }, [metricRows, m])
 
+  // 实际数据时间跨度计算（真实识别历史数据是覆盖全窗还是仅占一部分）
+  const dataSpanInfo = useMemo(() => {
+    if (metricRows.length === 0) return { actualHours: 0, text: "暂无遥测历史数据" }
+    const minTs = metricRows[0].ts
+    const maxTs = metricRows[metricRows.length - 1].ts
+    const spanMs = Math.max(0, maxTs - minTs)
+    const actualHours = Math.max(0.1, spanMs / (3600 * 1000))
+    const windowLabel = hours < 24 ? `${hours} 小时` : `${Math.round(hours / 24)} 天`
+
+    if (actualHours < hours * 0.75) {
+      const actualLabel =
+        actualHours < 1
+          ? `${Math.max(1, Math.round(actualHours * 60))} 分钟`
+          : actualHours < 24
+            ? `${actualHours.toFixed(1)} 小时`
+            : `${(actualHours / 24).toFixed(1)} 天`
+      return {
+        actualHours,
+        text: `请求窗口 ${windowLabel} · 实际数据跨度约 ${actualLabel}（共 ${metricRows.length} 采样点）`,
+      }
+    }
+    return {
+      actualHours,
+      text: `涵盖最近 ${windowLabel} · 共 ${metricRows.length} 采样点`,
+    }
+  }, [metricRows, hours])
+
+  // 窗口内实际估算产生的网络吞吐流量
+  const windowTraffic = useMemo(() => {
+    if (metricRows.length < 2) {
+      return {
+        rx: node.day_rx,
+        tx: node.day_tx,
+        total: node.day_rx + node.day_tx,
+      }
+    }
+    const durationSec = Math.max(1, (metricRows[metricRows.length - 1].ts - metricRows[0].ts) / 1000)
+    const rxBytes = Math.round(stats.avgRx * durationSec)
+    const txBytes = Math.round(stats.avgTx * durationSec)
+    return {
+      rx: rxBytes,
+      tx: txBytes,
+      total: rxBytes + txBytes,
+    }
+  }, [metricRows, stats.avgRx, stats.avgTx, node.day_rx, node.day_tx])
+
   // 3. 内存与存储环形饼图数据
   const ramPieData = useMemo(() => {
     const total = node.mem_total || 1
@@ -252,65 +300,102 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
   }, [node.disk_total, m, metricRows])
 
   const trafficPieData = useMemo(() => {
-    const rx = node.month_rx || node.day_rx || 1
-    const tx = node.month_tx || node.day_tx || 1
+    const rx = windowTraffic.rx || 1
+    const tx = windowTraffic.tx || 1
     return [
       { name: "下行入网 (RX)", value: rx, color: "var(--color-ok)" },
       { name: "上行出网 (TX)", value: tx, color: "var(--color-chart-1)" },
     ]
-  }, [node.month_rx, node.month_tx, node.day_rx, node.day_tx])
+  }, [windowTraffic])
 
-  // 4. 活动热力图（将历史时序切分为 24 等分时间桶）
+  // 4. 活动热力图（根据请求时间跨度自适应为日级或时钟级聚合，空缺时段真实显示无数据，绝不虚构 0% / 0B）
   const heatmapBuckets = useMemo(() => {
     if (metricRows.length === 0) return []
-    const bucketCount = 24
-    const minTs = metricRows[0].ts
-    const maxTs = metricRows[metricRows.length - 1].ts
-    const duration = Math.max(1, maxTs - minTs)
-    const step = duration / bucketCount
 
-    const buckets = Array.from({ length: bucketCount }, (_, i) => {
-      const bMin = minTs + i * step
+    const now = metricRows[metricRows.length - 1].ts
+    let bucketCount = 24
+    let isDaily = false
+
+    if (hours === 168) {
+      // 7 天模式：7 个天级桶
+      bucketCount = 7
+      isDaily = true
+    } else if (hours >= 720) {
+      // 30 天模式（或更长）：30 个天级桶
+      bucketCount = Math.min(30, Math.round(hours / 24))
+      isDaily = true
+    } else {
+      // 24 小时或以内：24 个时段桶
+      bucketCount = 24
+      isDaily = false
+    }
+
+    const totalDuration = hours * 3600 * 1000
+    const step = totalDuration / bucketCount
+    const windowStart = now - totalDuration
+
+    return Array.from({ length: bucketCount }, (_, i) => {
+      const bMin = windowStart + i * step
       const bMax = bMin + step
       const items = metricRows.filter((r) => r.ts >= bMin && r.ts < bMax)
+      const hasData = items.length > 0
       const count = items.length || 1
 
-      const avgCpu = items.reduce((acc, r) => acc + r.cpu, 0) / count
-      const maxCpu = items.reduce((acc, r) => Math.max(acc, r.cpu), 0)
-      const memUsed = items.reduce((acc, r) => acc + r.mem_used, 0) / count
-      const rxRate = items.reduce((acc, r) => acc + r.net_rx, 0) / count
-      const txRate = items.reduce((acc, r) => acc + r.net_tx, 0) / count
+      const avgCpu = hasData ? items.reduce((acc, r) => acc + r.cpu, 0) / count : 0
+      const maxCpu = hasData ? items.reduce((acc, r) => Math.max(acc, r.cpu), 0) : 0
+      const memUsed = hasData ? items.reduce((acc, r) => acc + r.mem_used, 0) / count : 0
+      const rxRate = hasData ? items.reduce((acc, r) => acc + r.net_rx, 0) / count : 0
+      const txRate = hasData ? items.reduce((acc, r) => acc + r.net_tx, 0) / count : 0
 
       const dateObj = new Date(bMin)
-      const label = `${String(dateObj.getHours()).padStart(2, "0")}:${String(dateObj.getMinutes()).padStart(2, "0")}`
+      const label = isDaily
+        ? `${dateObj.getMonth() + 1}/${dateObj.getDate()}`
+        : hours === 24
+          ? `${String(dateObj.getHours()).padStart(2, "0")}:00`
+          : `${String(dateObj.getHours()).padStart(2, "0")}:${String(dateObj.getMinutes()).padStart(2, "0")}`
+
+      const fullLabel = isDaily
+        ? `${dateObj.getFullYear()}/${dateObj.getMonth() + 1}/${dateObj.getDate()}`
+        : `${dateObj.getMonth() + 1}/${dateObj.getDate()} ${String(dateObj.getHours()).padStart(2, "0")}:${String(dateObj.getMinutes()).padStart(2, "0")}`
 
       return {
         index: i,
         label,
+        fullLabel,
+        hasData,
         avgCpu,
         maxCpu,
         memUsed,
         rxRate,
         txRate,
+        sampleCount: items.length,
       }
     })
+  }, [metricRows, hours])
 
-    return buckets
-  }, [metricRows])
+  const heatmapTitle = useMemo(() => {
+    if (hours === 168) return "近 7 天每日负荷活动热力矩阵 (7-Day Daily Activity Matrix)"
+    if (hours >= 720) return `近 ${Math.round(hours / 24)} 天每日负荷活动热力矩阵 (${Math.round(hours / 24)}-Day Daily Activity Matrix)`
+    return "24 时段时钟负荷活动热力矩阵 (24-Hour Activity Heatmap)"
+  }, [hours])
 
-  // 时间轴配置
-  const timeAxis = (rows: { ts: number }[], from = 0, to = rows.length - 1) => {
-    const ticks = rows.length ? timeTicks(rows[from].ts, rows[to].ts) : []
+  // 时间轴配置（以请求窗口为基准对齐时间轴，真实呈现数据实际起止与空缺分布，绝不盲目拉伸变形）
+  const timeAxis = useMemo(() => {
+    const now = metricRows.length > 0 ? metricRows[metricRows.length - 1].ts : Date.now()
+    const windowStart = now - hours * 3600 * 1000
+    const windowEnd = now
+    const ticks = timeTicks(windowStart, windowEnd)
+
     return {
       dataKey: "ts",
       type: "number" as const,
-      domain: ["dataMin", "dataMax"] as const,
+      domain: [windowStart, windowEnd] as [number, number],
       ticks,
       tickFormatter: tickClock(ticks, hours),
       minTickGap: hours > 24 ? 72 : 40,
       ...AXIS,
     }
-  }
+  }, [metricRows, hours])
 
   // 瞬时百分比计算
   const currentCpuPct = m ? m.cpu : stats.avgCpu
@@ -331,7 +416,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
           <Activity className="size-3.5 text-primary" />
           <span className="font-semibold text-foreground">主机资源分析测控</span>
           <span className="text-xs text-muted-foreground font-medium">
-            · {metricRows.length} 采样点 · 涵盖最近 {hours} 小时
+            · {dataSpanInfo.text}
           </span>
         </div>
 
@@ -423,8 +508,8 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
               />
             </div>
             <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
-              <span>均值 {stats.avgCpu.toFixed(1)}%</span>
-              <span>峰值 {stats.maxCpu.toFixed(1)}%</span>
+              <span>窗口均值 {stats.avgCpu.toFixed(1)}%</span>
+              <span>窗口峰值 {stats.maxCpu.toFixed(1)}%</span>
             </div>
           </div>
 
@@ -446,8 +531,8 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
               />
             </div>
             <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
-              <span>已用 {bytes(m ? m.mem_used : stats.avgMem)}</span>
-              <span>总量 {bytes(node.mem_total)}</span>
+              <span>实时 {bytes(m ? m.mem_used : stats.avgMem)}</span>
+              <span>均值 {bytes(stats.avgMem)}</span>
             </div>
           </div>
 
@@ -485,7 +570,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                 <span>网络带宽吞吐</span>
               </span>
               <span className="font-mono text-xs font-semibold text-foreground">
-                {currentTrafficPct !== null ? `${currentTrafficPct.toFixed(1)}%` : "实时"}
+                {currentTrafficPct !== null ? `月配额 ${currentTrafficPct.toFixed(1)}%` : `峰值 ${rate(Math.max(stats.maxRx, stats.maxTx))}`}
               </span>
             </div>
             <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
@@ -497,8 +582,8 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
               />
             </div>
             <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
-              <span>↓ {rate(m ? m.net_rx : stats.avgRx)}</span>
-              <span>↑ {rate(m ? m.net_tx : stats.avgTx)}</span>
+              <span>均值 ↓ {rate(stats.avgRx)}</span>
+              <span>均值 ↑ {rate(stats.avgTx)}</span>
             </div>
           </div>
         </div>
@@ -608,7 +693,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
           {/* 流量上下行比例饼图 */}
           <div className="relative overflow-visible flex flex-col rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs sm:col-span-2 lg:col-span-1 hover:z-30 transition-all">
             <div className="border-b border-border/40 pb-1.5 text-xs font-medium text-foreground">
-              网络入出流量份额
+              {hours <= 24 ? "今日/窗口流量构成" : `近 ${hours < 720 ? `${Math.round(hours / 24)} 天` : "30 天"}流量构成`}
             </div>
             <div className="relative mt-2 flex h-36 items-center justify-center overflow-visible">
               <ResponsiveContainer width="100%" height="100%">
@@ -662,7 +747,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
               <Flame className="size-3.5 text-warn" />
-              <span>时段负荷活动热力矩阵 (24-Bucket Activity Heatmap)</span>
+              <span>{heatmapTitle}</span>
             </div>
             <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
               <span>低负荷 (0%)</span>
@@ -678,21 +763,32 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
           </div>
 
           {/* 热力格子矩阵 */}
-          <div className="mt-3 grid grid-cols-6 gap-1 sm:grid-cols-12 md:grid-cols-24">
+          <div
+            className={cn(
+              "mt-3 grid gap-1",
+              heatmapBuckets.length === 7
+                ? "grid-cols-7"
+                : heatmapBuckets.length === 30
+                  ? "grid-cols-6 sm:grid-cols-10 md:grid-cols-15 lg:grid-cols-30"
+                  : "grid-cols-6 sm:grid-cols-12 md:grid-cols-24"
+            )}
+          >
             {heatmapBuckets.map((bucket) => {
               const cpu = bucket.avgCpu
-              // 根据 CPU 负荷计算阶梯背景色
-              let bgStyle = "bg-muted/50 border-border/30 text-muted-foreground"
-              if (cpu > 80) bgStyle = "bg-rose-500/75 border-rose-500 text-white font-bold"
-              else if (cpu > 60) bgStyle = "bg-amber-500/60 border-amber-500/80 text-foreground font-semibold"
-              else if (cpu > 35) bgStyle = "bg-sky-500/45 border-sky-500/60 text-foreground font-medium"
-              else if (cpu > 15) bgStyle = "bg-emerald-500/35 border-emerald-500/50 text-foreground"
+              let bgStyle = "bg-muted/20 border-dashed border-border/40 text-muted-foreground/60 cursor-default"
+              if (bucket.hasData) {
+                if (cpu > 80) bgStyle = "bg-rose-500/75 border-rose-500 text-white font-bold"
+                else if (cpu > 60) bgStyle = "bg-amber-500/60 border-amber-500/80 text-foreground font-semibold"
+                else if (cpu > 35) bgStyle = "bg-sky-500/45 border-sky-500/60 text-foreground font-medium"
+                else if (cpu > 15) bgStyle = "bg-emerald-500/35 border-emerald-500/50 text-foreground"
+                else bgStyle = "bg-muted/60 border-border/50 text-foreground/80 font-medium"
+              }
 
               return (
                 <div
                   key={`heat-${bucket.index}`}
                   className={cn(
-                    "flex flex-col items-center justify-center rounded-[1px] border py-1.5 px-0.5 text-center cursor-pointer transition-all hover:ring-1 hover:ring-primary hover:brightness-110 active:scale-[0.98]",
+                    "flex flex-col items-center justify-center rounded-[1px] border py-1.5 px-0.5 text-center transition-all hover:ring-1 hover:ring-primary hover:brightness-110 active:scale-[0.98]",
                     bgStyle
                   )}
                   onMouseEnter={() => setHoveredHeatCell(bucket)}
@@ -700,7 +796,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                 >
                   <span className="text-[10px] font-mono leading-tight opacity-90">{bucket.label}</span>
                   <span className="text-xs font-mono font-bold leading-tight mt-0.5">
-                    {cpu < 1 ? "<1" : cpu.toFixed(0)}%
+                    {!bucket.hasData ? "—" : cpu < 1 ? "<1%" : `${cpu.toFixed(0)}%`}
                   </span>
                 </div>
               )
@@ -712,14 +808,20 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
             {hoveredHeatCell ? (
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 w-full text-foreground animate-fade-in">
                 <span className="font-semibold text-primary">
-                  时段 {hoveredHeatCell.label}
+                  {hoveredHeatCell.fullLabel}
                 </span>
-                <span>平均 CPU：<strong className="font-semibold text-foreground">{hoveredHeatCell.avgCpu.toFixed(1)}%</strong></span>
-                <span>CPU 峰值：<strong className="font-semibold text-foreground">{hoveredHeatCell.maxCpu.toFixed(1)}%</strong></span>
-                <span>内存：<strong className="font-semibold text-foreground">{bytes(hoveredHeatCell.memUsed)}</strong></span>
-                <span>
-                  速率：↓ {rate(hoveredHeatCell.rxRate)} · ↑ {rate(hoveredHeatCell.txRate)}
-                </span>
+                {hoveredHeatCell.hasData ? (
+                  <>
+                    <span>平均 CPU：<strong className="font-semibold text-foreground">{hoveredHeatCell.avgCpu.toFixed(1)}%</strong></span>
+                    <span>CPU 峰值：<strong className="font-semibold text-foreground">{hoveredHeatCell.maxCpu.toFixed(1)}%</strong></span>
+                    <span>内存：<strong className="font-semibold text-foreground">{bytes(hoveredHeatCell.memUsed)}</strong></span>
+                    <span>
+                      速率：↓ {rate(hoveredHeatCell.rxRate)} · ↑ {rate(hoveredHeatCell.txRate)}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground font-medium">该时间段暂无上报的遥测采样数据（节点可能未注册或处于停机状态）</span>
+                )}
               </div>
             ) : (
               <div className="flex items-center justify-center w-full gap-2 text-muted-foreground font-medium">
@@ -749,7 +851,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
               <ResponsiveContainer>
                 <AreaChart data={chartRows}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                  <XAxis {...timeAxis(chartRows)} />
+                  <XAxis {...timeAxis} />
                   <YAxis {...axes.cpu} unit="%" {...VALUE_AXIS} />
                   <Tooltip {...TOOLTIP_STYLE} formatter={(v) => [`${Number(v).toFixed(1)}%`, "CPU 负荷"]} />
                   <Area
@@ -779,7 +881,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
               <ResponsiveContainer>
                 <AreaChart data={chartRows}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                  <XAxis {...timeAxis(chartRows)} />
+                  <XAxis {...timeAxis} />
                   <YAxis
                     domain={[0, node.mem_total]}
                     ticks={quarters(node.mem_total)}
@@ -815,7 +917,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
               <ResponsiveContainer>
                 <ComposedChart data={chartRows}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                  <XAxis {...timeAxis(chartRows)} />
+                  <XAxis {...timeAxis} />
                   <YAxis scale="log" {...axes.rate} tickFormatter={axisBytes} unit="/s" {...VALUE_AXIS} />
                   <Tooltip
                     {...TOOLTIP_STYLE}
@@ -864,7 +966,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
               <ResponsiveContainer>
                 <AreaChart data={chartRows}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                  <XAxis {...timeAxis(chartRows)} />
+                  <XAxis {...timeAxis} />
                   <YAxis
                     domain={[0, node.disk_total]}
                     ticks={quarters(node.disk_total)}

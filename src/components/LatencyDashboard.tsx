@@ -107,31 +107,33 @@ export function LatencyDashboard({
   // 1. 各探测线路样式映射（稳定绑定）
   const getStyle = (id: number) => getProbeStyle(id, pingSeries)
 
-  // 2. 探测线路综合指标分析（最新、均值、最低、最高、抖动与质量等级）
+  // 2. 探测线路综合指标分析（最新、均值、最低、最高、抖动与质量等级，处理空数据状态）
   const probeSummaries = useMemo(() => {
     return pingSeries.map((s) => {
       const validPoints = s.points.filter((p) => p.latency !== null && p.latency !== undefined)
       const values = validPoints.map((p) => p.latency as number)
 
       const latest = validPoints.length > 0 ? validPoints[validPoints.length - 1].latency : null
-      const min = values.length > 0 ? Math.min(...values) : 0
-      const max = values.length > 0 ? Math.max(...values) : 0
+      const min = values.length > 0 ? Math.min(...values) : null
+      const max = values.length > 0 ? Math.max(...values) : null
       const sum = values.reduce((acc, v) => acc + v, 0)
-      const avg = values.length > 0 ? sum / values.length : 0
+      const avg = values.length > 0 ? sum / values.length : null
 
       // 计算网络抖动（相邻采样点差值的绝对值均值）
       let diffSum = 0
       for (let i = 1; i < values.length; i++) {
         diffSum += Math.abs(values[i] - values[i - 1])
       }
-      const jitter = values.length > 1 ? diffSum / (values.length - 1) : 0
+      const jitter = values.length > 1 ? diffSum / (values.length - 1) : null
 
       // 线路质量等级评级
       let tier = {
         label: "极佳",
         colorClass: "text-emerald-500",
       }
-      if (avg >= 200 || s.loss >= 15) {
+      if (avg === null) {
+        tier = { label: "暂无数据", colorClass: "text-muted-foreground" }
+      } else if (avg >= 200 || s.loss >= 15) {
         tier = { label: "较差", colorClass: "text-rose-500" }
       } else if (avg >= 100 || s.loss >= 5) {
         tier = { label: "一般", colorClass: "text-amber-500" }
@@ -160,6 +162,27 @@ export function LatencyDashboard({
       }
     })
   }, [pingSeries])
+
+  // 实际数据时间跨度计算
+  const latencyDataSpan = useMemo(() => {
+    const allSamples = pingSeries.flatMap((s) => s.points)
+    if (allSamples.length === 0) return ""
+    const minTs = allSamples.reduce((min, p) => Math.min(min, p.ts * 1000), Infinity)
+    const maxTs = allSamples.reduce((max, p) => Math.max(max, p.ts * 1000), 0)
+    const actualHours = Math.max(0.1, (maxTs - minTs) / (3600 * 1000))
+    const windowLabel = hours < 24 ? `${hours} 小时` : `${Math.round(hours / 24)} 天`
+
+    if (actualHours < hours * 0.75) {
+      const actualLabel =
+        actualHours < 1
+          ? `${Math.max(1, Math.round(actualHours * 60))} 分钟`
+          : actualHours < 24
+            ? `${actualHours.toFixed(1)} 小时`
+            : `${(actualHours / 24).toFixed(1)} 天`
+      return `窗口 ${windowLabel}（实际跨度约 ${actualLabel}）`
+    }
+    return `涵盖最近 ${windowLabel}`
+  }, [pingSeries, hours])
 
   // 3. 构建多线路时间对齐行（用于聚合图表）
   const pingRows = useMemo(() => {
@@ -198,27 +221,36 @@ export function LatencyDashboard({
     [pingSeries, hiddenProbes]
   )
 
-  // 5. 排序排行图表数据（按平均延迟由快到慢排序）
+  // 5. 排序排行图表数据（按平均延迟由快到慢排序，过滤无有效采样）
   const rankingData = useMemo(() => {
     return [...probeSummaries]
-      .sort((a, b) => a.avg - b.avg)
+      .filter((s) => s.avg !== null)
+      .sort((a, b) => (a.avg ?? 0) - (b.avg ?? 0))
       .map((s) => ({
         name: s.name,
-        avg: Math.round(s.avg),
-        min: Math.round(s.min),
-        max: Math.round(s.max),
-        jitter: Math.round(s.jitter),
+        avg: Math.round(s.avg ?? 0),
+        min: Math.round(s.min ?? 0),
+        max: Math.round(s.max ?? 0),
+        jitter: Math.round(s.jitter ?? 0),
         loss: s.loss,
       }))
   }, [probeSummaries])
 
-  // 时间轴生成器
+  // 时间轴生成器（根据请求窗口与缩放区间对齐时间轴，真实呈现数据实际起止与空缺分布）
   const timeAxis = (rows: { ts: number }[], from = 0, to = rows.length - 1) => {
-    const ticks = rows.length ? timeTicks(rows[from].ts, rows[to].ts) : []
+    const isZoomed = zoom !== null
+    const now = rows.length > 0 ? rows[rows.length - 1].ts : Date.now()
+    const windowStart = now - hours * 3600 * 1000
+    const windowEnd = now
+
+    const domainStart = isZoomed ? (rows[from]?.ts ?? windowStart) : windowStart
+    const domainEnd = isZoomed ? (rows[to]?.ts ?? windowEnd) : windowEnd
+    const ticks = timeTicks(domainStart, domainEnd)
+
     return {
       dataKey: "ts",
       type: "number" as const,
-      domain: ["dataMin", "dataMax"] as const,
+      domain: [domainStart, domainEnd] as [number, number],
       ticks,
       tickFormatter: tickClock(ticks, hours),
       minTickGap: hours > 24 ? 72 : 40,
@@ -247,6 +279,11 @@ export function LatencyDashboard({
           <Badge className="h-4.5 rounded-[1px] px-1.5 text-[11px] font-mono text-muted-foreground border-border/60">
             {pingSeries.length} 条测试线路
           </Badge>
+          {latencyDataSpan && (
+            <span className="text-xs text-muted-foreground font-medium hidden sm:inline">
+              · {latencyDataSpan}
+            </span>
+          )}
         </div>
 
         {/* 交互工具栏：削峰开关与视图模式切换器 */}
@@ -396,7 +433,13 @@ export function LatencyDashboard({
               {/* 卡片底部：极值统计与独占聚焦快捷按钮 */}
               <div className="flex items-center justify-between border-t border-border/30 pt-1.5 text-xs font-mono text-muted-foreground">
                 <span className="font-medium">
-                  均 {Math.round(s.avg)} · 极 {Math.round(s.min)}-{Math.round(s.max)}
+                  {s.avg !== null ? (
+                    <>
+                      均 {Math.round(s.avg)} · 极 {Math.round(s.min ?? 0)}-{Math.round(s.max ?? 0)}
+                    </>
+                  ) : (
+                    "暂无采样数据"
+                  )}
                 </span>
                 <button
                   type="button"
@@ -538,7 +581,7 @@ export function LatencyDashboard({
                     <span className="font-semibold text-foreground truncate">{s.name}</span>
                   </div>
                   <div className="font-mono text-xs text-muted-foreground font-medium">
-                    最新: {s.latest !== null ? Math.round(s.latest) : "—"}ms · 均值: {Math.round(s.avg)}ms
+                    最新: {s.latest !== null ? Math.round(s.latest) : "—"}ms · 均值: {s.avg !== null ? `${Math.round(s.avg)}ms` : "—"}
                   </div>
                 </div>
 
