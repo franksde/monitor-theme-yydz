@@ -94,6 +94,55 @@ const TOOLTIP_STYLE = {
   },
 }
 
+type PieTooltipProps = {
+  active?: boolean
+  payload?: Array<{
+    name?: string
+    value?: number
+    payload?: {
+      name: string
+      value: number
+      color: string
+    }
+  }>
+  total?: number
+  unitFormatter?: (val: number) => string
+}
+
+/**
+ * 环形饼图定制悬浮提示框：
+ * 1. 彻底解决文字颜色继承切片偏暗背景色（如 muted）导致不可读的问题，统一使用高对比度 text-foreground。
+ * 2. 携带色标指示点与精准百分比，清晰易读。
+ */
+function CustomPieTooltip({ active, payload, total, unitFormatter = bytes }: PieTooltipProps) {
+  if (!active || !payload || !payload.length) return null
+  const item = payload[0]
+  const val = Number(item.value ?? 0)
+  const name = item.name ?? item.payload?.name ?? ""
+  const color = item.payload?.color ?? "var(--color-primary)"
+  const pct = total && total > 0 ? ((val / total) * 100).toFixed(1) : null
+
+  return (
+    <div className="min-w-[130px] rounded-[2px] border border-border/80 bg-card/95 px-3 py-2 text-xs shadow-xl backdrop-blur-xs select-none pointer-events-none z-50">
+      <div className="flex items-center gap-1.5 font-medium text-foreground">
+        <span
+          className="size-2 rounded-[0.5px] shrink-0"
+          style={{ backgroundColor: color }}
+        />
+        <span className="truncate">{name}</span>
+        {pct !== null && (
+          <span className="ml-auto font-mono text-[11px] font-normal text-muted-foreground">
+            {pct}%
+          </span>
+        )}
+      </div>
+      <div className="mt-1 font-mono text-xs font-bold text-foreground">
+        {unitFormatter(val)}
+      </div>
+    </div>
+  )
+}
+
 export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("overview")
   const [hoveredHeatCell, setHoveredHeatCell] = useState<{
@@ -188,7 +237,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
     const free = Math.max(0, total - used)
     return [
       { name: "已用内存", value: used, color: "var(--color-primary)" },
-      { name: "空闲可用", value: free, color: "var(--color-muted)" },
+      { name: "空闲可用", value: free, color: "var(--color-chart-3)" },
     ]
   }, [node.mem_total, m, stats.avgMem])
 
@@ -198,7 +247,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
     const free = Math.max(0, total - used)
     return [
       { name: "已用磁盘", value: used, color: "var(--color-chart-2)" },
-      { name: "剩余空间", value: free, color: "var(--color-muted)" },
+      { name: "剩余空间", value: free, color: "var(--color-chart-4)" },
     ]
   }, [node.disk_total, m, metricRows])
 
@@ -459,23 +508,24 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
       {(viewMode === "overview" || viewMode === "donut") && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {/* 内存环形饼图 */}
-          <div className="flex flex-col rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
+          <div className="relative overflow-visible flex flex-col rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs hover:z-30 transition-all">
             <div className="border-b border-border/40 pb-1.5 text-xs font-medium text-foreground">
               物理内存分布比例
             </div>
-            <div className="relative mt-2 flex h-32 items-center justify-center">
+            <div className="relative mt-2 flex h-36 items-center justify-center overflow-visible">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+                <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
                   <Tooltip
-                    contentStyle={TOOLTIP_STYLE.contentStyle}
-                    formatter={(v) => bytes(Number(v))}
+                    content={<CustomPieTooltip total={node.mem_total} />}
+                    allowEscapeViewBox={{ x: true, y: true }}
+                    wrapperStyle={{ zIndex: 1000, pointerEvents: "none" }}
                   />
                   <Pie
                     data={ramPieData}
                     dataKey="value"
                     nameKey="name"
-                    innerRadius={36}
-                    outerRadius={50}
+                    innerRadius={38}
+                    outerRadius={54}
                     stroke="var(--color-card)"
                     strokeWidth={2}
                   >
@@ -485,7 +535,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
-              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+              <div className="pointer-events-none absolute inset-0 z-0 flex flex-col items-center justify-center text-center">
                 <span className="font-mono text-sm font-bold text-foreground">
                   {currentMemPct.toFixed(0)}%
                 </span>
@@ -494,12 +544,12 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
             </div>
             <div className="mt-1 flex items-center justify-around border-t border-border/30 pt-2 text-xs font-mono font-medium">
               <div className="flex items-center gap-1.5">
-                <span className="size-2 rounded-[0.5px] bg-primary" />
+                <span className="size-2 rounded-[0.5px]" style={{ backgroundColor: ramPieData[0].color }} />
                 <span className="text-muted-foreground">已用:</span>
                 <span className="font-semibold text-foreground">{bytes(ramPieData[0].value)}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="size-2 rounded-[0.5px] bg-muted" />
+                <span className="size-2 rounded-[0.5px]" style={{ backgroundColor: ramPieData[1].color }} />
                 <span className="text-muted-foreground">可用:</span>
                 <span className="font-semibold text-foreground">{bytes(ramPieData[1].value)}</span>
               </div>
@@ -507,23 +557,24 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
           </div>
 
           {/* 磁盘环形饼图 */}
-          <div className="flex flex-col rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
+          <div className="relative overflow-visible flex flex-col rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs hover:z-30 transition-all">
             <div className="border-b border-border/40 pb-1.5 text-xs font-medium text-foreground">
               存储空间分布比例
             </div>
-            <div className="relative mt-2 flex h-32 items-center justify-center">
+            <div className="relative mt-2 flex h-36 items-center justify-center overflow-visible">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+                <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
                   <Tooltip
-                    contentStyle={TOOLTIP_STYLE.contentStyle}
-                    formatter={(v) => bytes(Number(v))}
+                    content={<CustomPieTooltip total={node.disk_total} />}
+                    allowEscapeViewBox={{ x: true, y: true }}
+                    wrapperStyle={{ zIndex: 1000, pointerEvents: "none" }}
                   />
                   <Pie
                     data={diskPieData}
                     dataKey="value"
                     nameKey="name"
-                    innerRadius={36}
-                    outerRadius={50}
+                    innerRadius={38}
+                    outerRadius={54}
                     stroke="var(--color-card)"
                     strokeWidth={2}
                   >
@@ -533,7 +584,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
-              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+              <div className="pointer-events-none absolute inset-0 z-0 flex flex-col items-center justify-center text-center">
                 <span className="font-mono text-sm font-bold text-foreground">
                   {currentDiskPct.toFixed(0)}%
                 </span>
@@ -542,12 +593,12 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
             </div>
             <div className="mt-1 flex items-center justify-around border-t border-border/30 pt-2 text-xs font-mono font-medium">
               <div className="flex items-center gap-1.5">
-                <span className="size-2 rounded-[0.5px] bg-chart-2" />
+                <span className="size-2 rounded-[0.5px]" style={{ backgroundColor: diskPieData[0].color }} />
                 <span className="text-muted-foreground">已用:</span>
                 <span className="font-semibold text-foreground">{bytes(diskPieData[0].value)}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="size-2 rounded-[0.5px] bg-muted" />
+                <span className="size-2 rounded-[0.5px]" style={{ backgroundColor: diskPieData[1].color }} />
                 <span className="text-muted-foreground">剩余:</span>
                 <span className="font-semibold text-foreground">{bytes(diskPieData[1].value)}</span>
               </div>
@@ -555,23 +606,24 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
           </div>
 
           {/* 流量上下行比例饼图 */}
-          <div className="flex flex-col rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs sm:col-span-2 lg:col-span-1">
+          <div className="relative overflow-visible flex flex-col rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs sm:col-span-2 lg:col-span-1 hover:z-30 transition-all">
             <div className="border-b border-border/40 pb-1.5 text-xs font-medium text-foreground">
               网络入出流量份额
             </div>
-            <div className="relative mt-2 flex h-32 items-center justify-center">
+            <div className="relative mt-2 flex h-36 items-center justify-center overflow-visible">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+                <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
                   <Tooltip
-                    contentStyle={TOOLTIP_STYLE.contentStyle}
-                    formatter={(v) => bytes(Number(v))}
+                    content={<CustomPieTooltip total={trafficPieData[0].value + trafficPieData[1].value} />}
+                    allowEscapeViewBox={{ x: true, y: true }}
+                    wrapperStyle={{ zIndex: 1000, pointerEvents: "none" }}
                   />
                   <Pie
                     data={trafficPieData}
                     dataKey="value"
                     nameKey="name"
-                    innerRadius={36}
-                    outerRadius={50}
+                    innerRadius={38}
+                    outerRadius={54}
                     stroke="var(--color-card)"
                     strokeWidth={2}
                   >
@@ -581,7 +633,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
-              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+              <div className="pointer-events-none absolute inset-0 z-0 flex flex-col items-center justify-center text-center">
                 <span className="font-mono text-xs font-bold text-foreground">
                   {trafficPieData[1].value >= trafficPieData[0].value ? "↑ 出网" : "↓ 入网"}
                 </span>
@@ -590,12 +642,12 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
             </div>
             <div className="mt-1 flex items-center justify-around border-t border-border/30 pt-2 text-xs font-mono font-medium">
               <div className="flex items-center gap-1.5">
-                <span className="size-2 rounded-[0.5px] bg-ok" />
+                <span className="size-2 rounded-[0.5px]" style={{ backgroundColor: trafficPieData[0].color }} />
                 <span className="text-muted-foreground">下行:</span>
                 <span className="font-semibold text-foreground">{bytes(trafficPieData[0].value)}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="size-2 rounded-[0.5px] bg-chart-1" />
+                <span className="size-2 rounded-[0.5px]" style={{ backgroundColor: trafficPieData[1].color }} />
                 <span className="text-muted-foreground">上行:</span>
                 <span className="font-semibold text-foreground">{bytes(trafficPieData[1].value)}</span>
               </div>
@@ -640,7 +692,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                 <div
                   key={`heat-${bucket.index}`}
                   className={cn(
-                    "flex flex-col items-center justify-center rounded-[1px] border py-1.5 px-0.5 text-center cursor-pointer transition-all hover:scale-105 hover:z-10",
+                    "flex flex-col items-center justify-center rounded-[1px] border py-1.5 px-0.5 text-center cursor-pointer transition-all hover:ring-1 hover:ring-primary hover:brightness-110 active:scale-[0.98]",
                     bgStyle
                   )}
                   onMouseEnter={() => setHoveredHeatCell(bucket)}
@@ -655,24 +707,27 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
             })}
           </div>
 
-          {/* 悬停单元格详情提示条 */}
-          {hoveredHeatCell ? (
-            <div className="mt-2.5 flex flex-wrap items-center justify-between rounded-[1px] border border-border/60 bg-muted/40 px-3 py-1.5 text-xs text-foreground font-mono animate-fade-in">
-              <span className="font-semibold text-primary">
-                时段：{hoveredHeatCell.label}
-              </span>
-              <span>平均 CPU：{hoveredHeatCell.avgCpu.toFixed(1)}%</span>
-              <span>CPU 峰值：{hoveredHeatCell.maxCpu.toFixed(1)}%</span>
-              <span>内存：{bytes(hoveredHeatCell.memUsed)}</span>
-              <span>
-                速率：↓ {rate(hoveredHeatCell.rxRate)} · ↑ {rate(hoveredHeatCell.txRate)}
-              </span>
-            </div>
-          ) : (
-            <div className="mt-2 text-center text-xs text-muted-foreground font-mono font-medium">
-              鼠标悬停热力方块查看时段 CPU 峰值、内存使用与流量详情
-            </div>
-          )}
+          {/* 悬停单元格详情提示条（预备好恒定高度容器，彻底根治悬浮信息切换时的元素抖动与高度跳跃） */}
+          <div className="mt-2.5 min-h-[38px] flex items-center justify-between rounded-[1px] border border-border/60 bg-muted/30 px-3 py-1.5 text-xs font-mono transition-colors">
+            {hoveredHeatCell ? (
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 w-full text-foreground animate-fade-in">
+                <span className="font-semibold text-primary">
+                  时段 {hoveredHeatCell.label}
+                </span>
+                <span>平均 CPU：<strong className="font-semibold text-foreground">{hoveredHeatCell.avgCpu.toFixed(1)}%</strong></span>
+                <span>CPU 峰值：<strong className="font-semibold text-foreground">{hoveredHeatCell.maxCpu.toFixed(1)}%</strong></span>
+                <span>内存：<strong className="font-semibold text-foreground">{bytes(hoveredHeatCell.memUsed)}</strong></span>
+                <span>
+                  速率：↓ {rate(hoveredHeatCell.rxRate)} · ↑ {rate(hoveredHeatCell.txRate)}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center w-full gap-2 text-muted-foreground font-medium">
+                <Activity className="size-3.5 opacity-60" />
+                <span>鼠标悬停上方任意时段热力方块，即时查看对应时段 CPU 峰值、内存使用与流量详情</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
