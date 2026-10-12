@@ -12,6 +12,28 @@
       "label": "显示汇总",
       "default": true,
       "help": "节点列表上方的节点数、最忙节点、流量和网速四格"
+    },
+    {
+      "key": "show_globe",
+      "type": "boolean",
+      "label": "显示地球拓扑",
+      "default": true,
+      "help": "节点列表上方的全球节点平面拓扑分布地图"
+    },
+    {
+      "key": "show_latency",
+      "type": "boolean",
+      "label": "卡片显示网络延迟",
+      "default": true,
+      "help": "在首页监控卡片底部展示各线路延迟测试数据、走势线与丢包率"
+    },
+    {
+      "key": "ping_lines",
+      "type": "text",
+      "label": "显示的延迟测试条目",
+      "default": "",
+      "help": "每行一个 ping 任务名称（如电信、联通、移动），或用逗号/分号分隔；留空则自动按顺序展示前 3 项"
     }
   ]
 }
+

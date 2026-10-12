@@ -159,3 +159,47 @@
 .pulse-online {
   animation: pulseDot 2.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* 专属 SVG 地球节点呼吸光环：仅改变透明度与描边，绝不碰 transform，确保与地球自转完美同频 */
+@keyframes pulseSvgGlow {
+  0%, 100% {
+    opacity: 0.85;
+    stroke-width: 1;
+  }
+  50% {
+    opacity: 0.25;
+    stroke-width: 1.8;
+  }
+}
+
+.pulse-globe-beacon {
+  animation: pulseSvgGlow 2s ease-in-out infinite;
+}
+
+/* 全球节点大圆网络互联链路流光动效：模拟海底光缆与卫星骨干网通信数据包 */
+@keyframes globeArcFlow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.globe-arc-flowing {
+  stroke-dasharray: 4 6;
+  animation: globeArcFlow 1.8s linear infinite;
+}
+
+/* 雷达扫掠弧线渐隐呼吸 */
+@keyframes radarSweepGlow {
+  0%, 100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.65;
+  }
+}
+
+.globe-radar-sweep {
+  animation: radarSweepGlow 2.4s ease-in-out infinite;
+}
+
+

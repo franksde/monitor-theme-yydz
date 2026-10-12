@@ -8,24 +8,12 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Meter } from "@/components/Meter"
+import { LatencySection } from "@/components/LatencySection"
 import type { Node } from "@/lib/api"
 import { bytes, daysUntil, FOREVER, osName, pair, percent, rate, sinceSeen, uptime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
-// Emitted as files and fetched on first use, so a page carries only the flags its
-// nodes are in rather than all 265. vite.config.ts keeps them from being inlined
-// into the bundle as data URLs. The simplified set, because this theme is
-// embedded in the hub binary: flag-icons' detailed emblems total 1.95 MiB against
-// 174 KiB here, a difference invisible at 18 by 12 pixels.
-const FLAGS = Object.fromEntries(
-  Object.entries(
-    import.meta.glob<string>("/node_modules/country-flag-icons/3x2/*.svg", {
-      query: "?url",
-      import: "default",
-      eager: true,
-    }),
-  ).map(([path, url]) => [path.match(/([\w-]+)\.svg$/)![1], url]),
-)
+import { FLAGS } from "@/lib/flags"
 
 // Matched against the whole release name, since "Red Hat Enterprise Linux" and
 // "Raspbian GNU/Linux" do not lead with one word to key on. The distributions a
@@ -162,7 +150,17 @@ function Expiry({ node }: { node: Node }) {
  * 节点卡片组件
  * 遵循 AGENT.md 规范：采用微倒角 rounded-[2px]，具备微提升发光 Hover 动效与平滑过渡
  */
-export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
+export function NodeCard({
+  node,
+  showLatency = true,
+  pingLines = "",
+  onOpen,
+}: {
+  node: Node
+  showLatency?: boolean
+  pingLines?: string
+  onOpen: () => void
+}) {
   const m = node.metrics
 
   return (
@@ -244,6 +242,9 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
               {bytes(node.total_tx)}
             </span>
           </div>
+
+          {/* 网络延迟测试数据条目 */}
+          <LatencySection node={node} pingLines={pingLines} enabled={showLatency} />
         </>
       ) : (
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">

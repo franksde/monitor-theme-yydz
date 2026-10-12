@@ -1,12 +1,15 @@
-import { lazy, Suspense, useCallback, useEffect, useState, useSyncExternalStore } from "react"
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react"
 import { Moon, Sun, Wrench } from "lucide-react"
 
+import { Globe } from "@/components/Globe"
 import { NodeCard } from "@/components/NodeCard"
 import { Summary } from "@/components/Summary"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { api, groupsOf, useNodes, type Node } from "@/lib/api"
 import { loadConfig } from "@/lib/config"
+import { resolveNodeGeo } from "@/lib/geo"
+
 
 // 站点信息接口类型定义（history_days 在早于按小时归档分档的 hub 版本中不存在）
 type Me = { authed: boolean; github: boolean; site_name: string; public_page: boolean; history_days?: number }
@@ -208,6 +211,9 @@ export default function App() {
               nodes={sorted}
               group={group}
               summary={config.show_summary === true}
+              showGlobe={config.show_globe !== false}
+              showLatency={config.show_latency !== false}
+              pingLines={typeof config.ping_lines === "string" ? config.ping_lines : ""}
               onGroup={setGroup}
               onOpen={go}
             />
@@ -219,17 +225,33 @@ export default function App() {
 }
 
 /**
- * 节点列表展示组件（包含分组切换 Tab、数据汇总卡片与卡片网格）
+ * 节点列表展示组件（包含分组切换 Tab、三维地球仪、数据汇总卡片与卡片网格）
  */
-function NodeList({ nodes, group, summary, onGroup, onOpen }: {
+function NodeList({
+  nodes,
+  group,
+  summary,
+  showGlobe,
+  showLatency,
+  pingLines,
+  onGroup,
+  onOpen,
+}: {
   nodes: Node[]
   group: string | null
   summary: boolean
+  showGlobe: boolean
+  showLatency: boolean
+  pingLines: string
   onGroup: (group: string | null) => void
   onOpen: (id: number) => void
 }) {
   const groups = groupsOf(nodes)
   const ungrouped = nodes.filter((n) => !n.group).length
+
+  // 地球仪折叠控制与地区筛选状态
+  const [globeOpen, setGlobeOpen] = useState(showGlobe)
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(null)
 
   // 分组有效性回退保护
   const current = group === null || (group === "" ? ungrouped > 0 : groups.includes(group)) ? group : null
@@ -237,7 +259,19 @@ function NodeList({ nodes, group, summary, onGroup, onOpen }: {
     if (current !== group) onGroup(current)
   }, [current, group, onGroup])
 
-  const shown = current === null ? nodes : nodes.filter((n) => (n.group ?? "") === current)
+  // 按分组初筛节点
+  const groupNodes = current === null ? nodes : nodes.filter((n) => (n.group ?? "") === current)
+
+  // 当在地球上选定特定地区时，进一步联动过滤节点卡片列表
+  const shown = useMemo<Node[]>(() => {
+    if (!selectedRegion) return groupNodes
+    return groupNodes.filter((n: Node) => {
+      const geo = resolveNodeGeo(n, 0)
+      return geo?.regionKey === selectedRegion
+    })
+  }, [groupNodes, selectedRegion])
+
+
   const tabs = [
     [null, "全部", nodes.length] as const,
     ...groups.map((g) => [g, g, nodes.filter((n) => n.group === g).length] as const),
@@ -246,47 +280,96 @@ function NodeList({ nodes, group, summary, onGroup, onOpen }: {
 
   return (
     <>
-      {/* 分组切换选项卡 */}
-      {groups.length > 0 && (
-        <div role="group" aria-label="分组" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
-          {tabs.map(([value, label, count]) => (
-            <Button
-              key={value === null ? "*" : `=${value}`}
-              aria-pressed={current === value}
-              size="sm"
-              variant={current === value ? "secondary" : "ghost"}
-              className={`shrink-0 rounded-[2px] transition-all duration-150 ${
-                current === value
-                  ? "border-border/80 font-semibold shadow-2xs"
-                  : "opacity-75 hover:opacity-100"
-              }`}
-              onClick={() => onGroup(value)}
-            >
-              <span>{label}</span>
-              <span className="tnum ml-1 rounded-[1px] bg-muted/60 px-1 py-0.2 text-[10px] text-muted-foreground">
-                {count}
-              </span>
-            </Button>
-          ))}
+      {/* 顶部操作行：分组切换选项卡与地球仪展开/折叠按钮 */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {groups.length > 0 && (
+          <div role="group" aria-label="分组" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+            {tabs.map(([value, label, count]) => (
+              <Button
+                key={value === null ? "*" : `=${value}`}
+                aria-pressed={current === value}
+                size="sm"
+                variant={current === value ? "secondary" : "ghost"}
+                className={`shrink-0 rounded-[2px] transition-all duration-150 ${
+                  current === value
+                    ? "border-border/80 font-semibold shadow-2xs"
+                    : "opacity-75 hover:opacity-100"
+                }`}
+                onClick={() => {
+                  onGroup(value)
+                  setSelectedRegion(null) // 切换分组时重置地区筛选
+                }}
+              >
+                <span>{label}</span>
+                <span className="tnum ml-1 rounded-[1px] bg-muted/60 px-1 py-0.2 text-[10px] text-muted-foreground">
+                  {count}
+                </span>
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {/* 地球仪视图显隐切换按钮 */}
+        <div className="ml-auto">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 rounded-[2px] px-2.5 text-xs text-muted-foreground hover:text-foreground border border-border/40"
+            onClick={() => setGlobeOpen((v) => !v)}
+          >
+            <span>{globeOpen ? "收起地球" : "展开地球"}</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* 专属三维正射投影地球仪 */}
+      {globeOpen && (
+        <Globe
+          nodes={groupNodes}
+          selectedRegion={selectedRegion}
+          onSelectRegion={setSelectedRegion}
+          onOpenNode={onOpen}
+        />
+      )}
+
+      {/* 四格关键指标汇总 */}
+      {summary && <Summary nodes={shown} group={current} />}
+
+      {/* 地区过滤状态提示条 */}
+      {selectedRegion && (
+        <div className="flex items-center justify-between rounded-[2px] border border-border/80 bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground animate-fade-in">
+          <span>
+            已按地区筛选：<strong className="text-foreground">{selectedRegion}</strong>（共 {shown.length} 台节点）
+          </span>
+          <button
+            onClick={() => setSelectedRegion(null)}
+            className="rounded-[1px] px-1.5 py-0.5 text-xs font-medium text-foreground underline hover:opacity-80"
+          >
+            清除地区筛选
+          </button>
         </div>
       )}
 
-      {/* 顶部四格指标汇总 */}
-      {summary && <Summary nodes={shown} group={current} />}
-
-      {/* 节点卡片网格 */}
-      {nodes.length === 0 ? (
-        <div className="py-20 text-center text-xs text-muted-foreground">
-          还没有接入任何节点
+      {/* 节点卡片列表网格 */}
+      {shown.length === 0 ? (
+        <div className="py-20 text-center text-xs text-muted-foreground animate-fade-in">
+          {selectedRegion ? "该地区暂无符合条件的节点" : "还没有接入任何节点"}
         </div>
       ) : (
         <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {shown.map((n) => (
-            <NodeCard key={n.id} node={n} onOpen={() => onOpen(n.id)} />
+            <NodeCard
+              key={n.id}
+              node={n}
+              showLatency={showLatency}
+              pingLines={pingLines}
+              onOpen={() => onOpen(n.id)}
+            />
           ))}
         </div>
       )}
     </>
   )
 }
+
 
