@@ -17,6 +17,8 @@ import {
   generateFlatGraticules,
   getClusterOffsets,
   projectNodesWithClustering,
+  getBeaconBrightness,
+  projectRegionBeacons,
 } from "./geo.ts"
 import type { Node } from "./api.ts"
 
@@ -151,5 +153,26 @@ assert.equal(clustered.length, 3)
 assert.ok(Math.abs(clustered[0].pt.x - clustered[1].pt.x) >= 6)
 assert.ok(Math.abs(clustered[1].pt.x - clustered[2].pt.x) >= 6)
 assert.equal(clustered[0].clusterTotal, 3)
+
+// 8. 地区单一亮点（亮度随节点数动态增长）与地区投影测试
+const b1 = getBeaconBrightness(1)
+const b3 = getBeaconBrightness(3)
+const b10 = getBeaconBrightness(10)
+
+// 节点数更多时，光核半径更大、光晕半径更广、综合亮度指标更高
+assert.ok(b3.coreRadius > b1.coreRadius)
+assert.ok(b3.haloRadius > b1.haloRadius)
+assert.ok(b3.intensity > b1.intensity)
+
+assert.ok(b10.coreRadius >= b3.coreRadius)
+assert.ok(b10.haloRadius >= b3.haloRadius)
+assert.ok(b10.intensity >= b3.intensity)
+
+// 1个地区仅生成1个独立亮点，且坐标与地区经纬度对齐
+const regionBeacons = projectRegionBeacons(summary, 800, 400)
+assert.equal(regionBeacons.length, summary.length)
+assert.equal(regionBeacons[0].region.key, summary[0].key)
+assert.ok(regionBeacons[0].pt.x > 0 && regionBeacons[0].pt.x < 800)
+assert.ok(regionBeacons[0].pt.y > 0 && regionBeacons[0].pt.y < 400)
 
 console.log("geo 模块单元测试全部通过")

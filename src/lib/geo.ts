@@ -239,6 +239,72 @@ export function projectNodesWithClustering(
 }
 
 /**
+ * 地区亮点投影数据结构
+ * 一个地区仅显示一个亮点，亮点的亮度与光晕由对应地区节点数量动态决定
+ */
+export type ProjectedRegionBeacon = {
+  region: RegionSummary
+  pt: { x: number; y: number }
+  coreRadius: number
+  coreOpacity: number
+  haloRadius: number
+  haloOpacity: number
+  intensity: number
+  hasOnline: boolean
+}
+
+/**
+ * 计算地区亮点的光学亮度与光晕参数
+ * 采用平滑对数增长曲线：节点数量越多，光核越大越白炽、光晕扩散范围越广
+ */
+export function getBeaconBrightness(total: number): {
+  coreRadius: number
+  coreOpacity: number
+  haloRadius: number
+  haloOpacity: number
+  intensity: number
+} {
+  const count = Math.max(1, total)
+  // 以 2 为底对数增长因数：1台时为 0，2台时约 0.3，4台时约 0.6，8~10台趋近 1.0 满度
+  const factor = Math.min(1, Math.log2(count) / 3.32)
+  const coreRadius = Math.min(6.2, 3.2 + factor * 3.0)
+  const coreOpacity = Math.min(1.0, 0.72 + factor * 0.28)
+  const haloRadius = Math.min(22.0, 7.5 + factor * 14.5)
+  const haloOpacity = Math.min(0.85, 0.30 + factor * 0.55)
+  const intensity = Math.min(1.0, 0.50 + factor * 0.50)
+
+  return {
+    coreRadius,
+    coreOpacity,
+    haloRadius,
+    haloOpacity,
+    intensity,
+  }
+}
+
+/**
+ * 批量投影全量地区并在平面地图上生成各地区独立亮点
+ */
+export function projectRegionBeacons(
+  regions: RegionSummary[],
+  width: number = FLAT_MAP_VIEW.width,
+  height: number = FLAT_MAP_VIEW.height
+): ProjectedRegionBeacon[] {
+  return regions.map((region) => {
+    const pt = projectFlat(region.lng, region.lat, width, height)
+    const brightness = getBeaconBrightness(region.total)
+    const hasOnline = region.online > 0
+
+    return {
+      region,
+      pt,
+      ...brightness,
+      hasOnline,
+    }
+  })
+}
+
+/**
  * 平面世界地图各大洲陆地几何生成器
  * 将高精度多边形环投射到平面视口，输出填充路径 (fill) 和海岸线描边路径 (stroke)
  */

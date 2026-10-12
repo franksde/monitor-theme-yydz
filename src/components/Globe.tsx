@@ -5,7 +5,7 @@
  * 遵循 AGENT.md 规范：采用中文注释、无缝平滑动画、微倒角 (2px) 工控极简风格、零多余外部依赖。
  */
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import {
   Globe as GlobeIcon,
   Maximize2,
@@ -21,10 +21,12 @@ import {
   FLAT_MAP_VIEW,
   generateFlatGraticules,
   generateFlatLandGeometry,
-  projectNodesWithClustering,
+  projectRegionBeacons,
   resolveNodeGeo,
   summarizeRegions,
   type GeoNode,
+  type ProjectedRegionBeacon,
+  type RegionSummary,
 } from "@/lib/geo"
 import { cn } from "@/lib/utils"
 
@@ -41,17 +43,21 @@ export function Globe({
   onSelectRegion,
   onOpenNode,
 }: GlobeProps) {
-  // 1. 悬停节点状态与 Tooltip 坐标
-  const [hoveredNodeId, setHoveredNodeId] = useState<number | null>(null)
-  const [tooltipData, setTooltipData] = useState<{
-    geo: GeoNode
+  // 地图容器 Ref（用于精确定位鼠标悬停小卡片）
+  const containerRef = useRef<HTMLDivElement>(null)
+  // 鼠标移出延迟计时器（提供平滑防抖过渡，使用户可将鼠标移入小卡片点击节点）
+  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 当前悬停激活的地区小卡片数据
+  const [activeCard, setActiveCard] = useState<{
+    region: RegionSummary
     x: number
     y: number
-    clusterTotal: number
-    clusterIndex: number
+    containerWidth: number
+    containerHeight: number
   } | null>(null)
 
-  // 2. 解析全量节点的地理落点（基准地理定位）
+  // 1. 解析全量节点的地理落点（基准地理定位）
   const geoNodes = useMemo(() => {
     const list: GeoNode[] = []
     nodes.forEach((node) => {
@@ -61,10 +67,10 @@ export function Globe({
     return list
   }, [nodes])
 
-  // 3. 地区聚合统计
+  // 2. 地区聚合统计
   const regions = useMemo(() => summarizeRegions(geoNodes), [geoNodes])
 
-  // 4. 平面世界陆地与经纬几何生成
+  // 3. 平面世界陆地与经纬几何生成
   const land = useMemo(
     () => generateFlatLandGeometry(FLAT_MAP_VIEW.width, FLAT_MAP_VIEW.height),
     []
@@ -74,22 +80,62 @@ export function Globe({
     []
   )
 
-  // 5. 计算全量节点在平面地图上的投影点（同地区多节点紧凑工控矩阵离散排布，彻底杜绝重合遮挡）
-  const projectedNodes = useMemo(() => {
-    const clusterList = projectNodesWithClustering(
-      geoNodes,
-      FLAT_MAP_VIEW.width,
-      FLAT_MAP_VIEW.height,
-      7.5
-    )
-    return clusterList.map((item) => {
-      const isSelected = selectedRegion ? item.geo.regionKey === selectedRegion : true
-      return {
-        ...item,
-        isSelected,
-      }
-    })
-  }, [geoNodes, selectedRegion])
+  // 4. 计算全量地区在平面地图上的独立亮点（一个地区一个亮点，亮度随节点数量动态调节）
+  const beacons = useMemo(() => {
+    return projectRegionBeacons(regions, FLAT_MAP_VIEW.width, FLAT_MAP_VIEW.height)
+  }, [regions])
+
+  // 鼠标悬停亮点：计算浮层坐标并弹出小卡片
+  const handleBeaconEnter = (
+    beacon: ProjectedRegionBeacon,
+    e: React.MouseEvent
+  ) => {
+    if (leaveTimerRef.current) {
+      clearTimeout(leaveTimerRef.current)
+      leaveTimerRef.current = null
+    }
+    const svg = e.currentTarget.closest("svg")
+    const container = containerRef.current
+    if (svg && container) {
+      const svgRect = svg.getBoundingClientRect()
+      const containerRect = container.getBoundingClientRect()
+      const scaleX = svgRect.width / FLAT_MAP_VIEW.width
+      const scaleY = svgRect.height / FLAT_MAP_VIEW.height
+      const screenX = svgRect.left - containerRect.left + beacon.pt.x * scaleX
+      const screenY = svgRect.top - containerRect.top + beacon.pt.y * scaleY
+      setActiveCard({
+        region: beacon.region,
+        x: screenX,
+        y: screenY,
+        containerWidth: containerRect.width,
+        containerHeight: containerRect.height,
+      })
+    }
+  }
+
+  // 鼠标离开亮点：启动短暂延迟，允许用户移动鼠标进入小卡片
+  const handleBeaconLeave = () => {
+    if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current)
+    leaveTimerRef.current = setTimeout(() => {
+      setActiveCard(null)
+    }, 180)
+  }
+
+  // 鼠标进入小卡片：取消关闭倒计时，保持小卡片常驻
+  const handleCardEnter = () => {
+    if (leaveTimerRef.current) {
+      clearTimeout(leaveTimerRef.current)
+      leaveTimerRef.current = null
+    }
+  }
+
+  // 鼠标离开小卡片：关闭小卡片
+  const handleCardLeave = () => {
+    if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current)
+    leaveTimerRef.current = setTimeout(() => {
+      setActiveCard(null)
+    }, 180)
+  }
 
   const totalPlaced = geoNodes.length
   const onlineCount = geoNodes.filter((g) => g.node.online).length
@@ -151,7 +197,10 @@ export function Globe({
       {/* 核心展示区：左侧平面地图大屏，右侧地区控制台 */}
       <div className="mt-3.5 grid gap-4 lg:grid-cols-12 lg:items-center">
         {/* 平面地图视口 */}
-        <div className="relative col-span-12 flex items-center justify-center overflow-hidden rounded-[2px] border border-border/40 bg-muted/15 p-2 select-none lg:col-span-8">
+        <div
+          ref={containerRef}
+          className="relative col-span-12 flex items-center justify-center overflow-hidden rounded-[2px] border border-border/40 bg-muted/15 p-2 select-none lg:col-span-8"
+        >
           <svg
             viewBox={`0 0 ${FLAT_MAP_VIEW.width} ${FLAT_MAP_VIEW.height}`}
             className="w-full h-auto aspect-[2/1]"
@@ -165,10 +214,18 @@ export function Globe({
                 <stop offset="100%" stopColor="var(--color-card)" stopOpacity="0.9" />
               </linearGradient>
 
-              {/* 节点选区微发光渐变 */}
-              <radialGradient id="highlightGlow" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.4" />
-                <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0" />
+              {/* 绿色在线亮点外围径向辉光 */}
+              <radialGradient id="beaconGlowGreen" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="var(--color-online)" stopOpacity="0.9" />
+                <stop offset="35%" stopColor="var(--color-online)" stopOpacity="0.45" />
+                <stop offset="100%" stopColor="var(--color-online)" stopOpacity="0" />
+              </radialGradient>
+
+              {/* 离线/告警地区亮点径向辉光 */}
+              <radialGradient id="beaconGlowWarn" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="var(--color-warn)" stopOpacity="0.8" />
+                <stop offset="40%" stopColor="var(--color-warn)" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="var(--color-warn)" stopOpacity="0" />
               </radialGradient>
             </defs>
 
@@ -236,92 +293,81 @@ export function Globe({
               ))}
             </g>
 
-            {/* 5. 全球所有节点落点针标（同地区多节点矩阵微离散展开，100% 独立可见、独立交互） */}
-            {projectedNodes.map(({ geo, pt, isSelected, clusterTotal, indexInCluster }) => {
-              const isOnline = geo.node.online
-              const isHovered = hoveredNodeId === geo.node.id
+            {/* 5. 全球各地区独立亮点（一个地区一个亮点，亮度的明暗与光晕大小严格取决于该地区节点的数量） */}
+            {beacons.map((b) => {
+              const isSelected = selectedRegion ? b.region.key === selectedRegion : true
+              const isHovered = activeCard?.region.key === b.region.key
+              const mainColor = b.hasOnline ? "var(--color-online)" : "var(--color-warn)"
+              const gradId = b.hasOnline ? "url(#beaconGlowGreen)" : "url(#beaconGlowWarn)"
 
               return (
                 <g
-                  key={`pin-${geo.node.id}`}
+                  key={`beacon-${b.region.key}`}
                   className="cursor-pointer"
                   opacity={isSelected ? 1 : 0.25}
                   style={{ transition: "opacity 200ms ease" }}
                   onClick={(e) => {
                     e.stopPropagation()
-                    onOpenNode(geo.node.id)
+                    onSelectRegion(selectedRegion === b.region.key ? null : b.region.key)
                   }}
-                  onMouseEnter={(e) => {
-                    setHoveredNodeId(geo.node.id)
-                    const svgRect = e.currentTarget.closest("svg")?.getBoundingClientRect()
-                    const containerRect = e.currentTarget.closest("div")?.getBoundingClientRect()
-                    if (svgRect && containerRect) {
-                      const scaleX = svgRect.width / FLAT_MAP_VIEW.width
-                      const scaleY = svgRect.height / FLAT_MAP_VIEW.height
-                      const screenX = svgRect.left - containerRect.left + pt.x * scaleX
-                      const screenY = svgRect.top - containerRect.top + pt.y * scaleY
-                      setTooltipData({
-                        geo,
-                        x: screenX,
-                        y: screenY,
-                        clusterTotal,
-                        clusterIndex: indexInCluster,
-                      })
-                    }
-                  }}
-                  onMouseLeave={() => {
-                    setHoveredNodeId(null)
-                    setTooltipData(null)
-                  }}
+                  onMouseEnter={(e) => handleBeaconEnter(b, e)}
+                  onMouseLeave={handleBeaconLeave}
                 >
-                  {/* 在线节点呼吸光环 */}
-                  {isOnline && isSelected && (
+                  {/* 5.1 径向发光光晕（扩散半径与不透明度随节点数量增长） */}
+                  <circle
+                    cx={b.pt.x}
+                    cy={b.pt.y}
+                    r={isHovered ? b.haloRadius * 1.3 : b.haloRadius}
+                    fill={gradId}
+                    opacity={isHovered ? 1 : b.haloOpacity}
+                    style={{ transition: "r 180ms ease, opacity 180ms ease" }}
+                  />
+
+                  {/* 5.2 在线地区呼吸脉冲环（节点越多环越宽越明显） */}
+                  {b.hasOnline && (
                     <circle
-                      cx={pt.x}
-                      cy={pt.y}
-                      r="5.5"
+                      cx={b.pt.x}
+                      cy={b.pt.y}
+                      r={isHovered ? b.haloRadius * 0.95 : b.haloRadius * 0.75}
                       fill="none"
-                      stroke="var(--color-online)"
+                      stroke={mainColor}
+                      strokeWidth={Math.min(2.4, 0.8 + b.intensity * 1.3)}
+                      opacity={Math.min(0.9, 0.35 + b.intensity * 0.45)}
                       className="pulse-globe-beacon"
                     />
                   )}
 
-                  {/* 悬停高亮大光晕 */}
-                  {isHovered && (
+                  {/* 5.3 核心亮斑（半径与不透明度随节点数量递增） */}
+                  <circle
+                    cx={b.pt.x}
+                    cy={b.pt.y}
+                    r={isHovered ? b.coreRadius + 1.2 : b.coreRadius}
+                    fill={mainColor}
+                    opacity={b.coreOpacity}
+                    style={{ transition: "r 150ms ease" }}
+                  />
+
+                  {/* 5.4 节点密集区白炽光核（节点数 >= 2 时呈现高能炽白中心点） */}
+                  {b.region.total >= 2 && (
                     <circle
-                      cx={pt.x}
-                      cy={pt.y}
-                      r="12"
-                      fill="url(#highlightGlow)"
+                      cx={b.pt.x}
+                      cy={b.pt.y}
+                      r={(isHovered ? b.coreRadius + 1.2 : b.coreRadius) * 0.45}
+                      fill="#ffffff"
+                      opacity={Math.min(0.95, 0.45 + b.intensity * 0.5)}
                     />
                   )}
 
-                  {/* 节点微倒角方块落点标 */}
-                  <rect
-                    x={pt.x - (isHovered ? 3.5 : 2.5)}
-                    y={pt.y - (isHovered ? 3.5 : 2.5)}
-                    width={isHovered ? 7 : 5}
-                    height={isHovered ? 7 : 5}
-                    rx="1"
-                    className={cn(
-                      "transition-all duration-150",
-                      isOnline
-                        ? isSelected
-                          ? "fill-online stroke-background stroke-1"
-                          : "fill-online opacity-40"
-                        : "fill-muted-foreground/60"
-                    )}
-                  />
-
-                  {/* 悬停时外圈工控准星 */}
-                  {isHovered && (
+                  {/* 5.5 鼠标悬停或选中状态下的工控瞄准准星环 */}
+                  {(isHovered || selectedRegion === b.region.key) && (
                     <circle
-                      cx={pt.x}
-                      cy={pt.y}
-                      r="7.5"
+                      cx={b.pt.x}
+                      cy={b.pt.y}
+                      r={b.haloRadius + 3}
                       fill="none"
                       stroke="var(--color-foreground)"
                       strokeWidth="1.2"
+                      strokeDasharray="3 2"
                     />
                   )}
                 </g>
@@ -331,53 +377,74 @@ export function Globe({
 
           {/* 交互提示微标签 */}
           <div className="pointer-events-none absolute bottom-3 left-4 text-[10px] font-mono text-muted-foreground opacity-60">
-            悬停节点查看测控详情 · 点击节点打开指标监控
+            悬停亮点查看地区节点 · 点击亮点筛选地区
           </div>
 
-          {/* 节点悬浮卡片微弹层（智能依节点视口自适应贴靠，彻底杜绝横屏错位） */}
-          {tooltipData && (
+          {/* 鼠标移动到亮点上之后显示的小卡片：列出对应节点，主机名 + 在线状态（一个绿色的点点） */}
+          {activeCard && (
             <div
-              className="pointer-events-none absolute z-20 rounded-[2px] border border-border/80 bg-card/95 px-2.5 py-1.5 text-xs shadow-md backdrop-blur-xs transition-transform duration-75"
+              className="absolute z-20 min-w-[190px] max-w-[290px] rounded-[2px] border border-border/80 bg-card/95 p-2.5 text-xs shadow-lg backdrop-blur-xs transition-all duration-75 select-none animate-fade-in"
               style={{
-                left: `${tooltipData.x}px`,
-                top: `${tooltipData.y}px`,
-                transform: `translate(${tooltipData.x > 320 ? "calc(-100% - 10px)" : "12px"}, -50%)`,
+                left: `${activeCard.x}px`,
+                top: `${activeCard.y}px`,
+                transform: `translate(${
+                  activeCard.x > activeCard.containerWidth * 0.65
+                    ? "calc(-100% - 12px)"
+                    : "12px"
+                }, ${
+                  activeCard.y < 80
+                    ? "0%"
+                    : activeCard.y > activeCard.containerHeight * 0.75
+                      ? "-100%"
+                      : "-50%"
+                })`,
               }}
+              onMouseEnter={handleCardEnter}
+              onMouseLeave={handleCardLeave}
             >
-              <div className="flex items-center gap-1.5 font-medium text-foreground">
-                {FLAGS[tooltipData.geo.country] && (
+              {/* 地区标题栏：国旗 + 城市/国家 + 节点统计 */}
+              <div className="flex items-center gap-1.5 border-b border-border/60 pb-1.5 mb-2 font-medium text-foreground">
+                {FLAGS[activeCard.region.country] && (
                   <img
-                    src={FLAGS[tooltipData.geo.country]}
-                    alt={tooltipData.geo.country}
-                    className="h-3 w-4 rounded-[1px] object-cover"
+                    src={FLAGS[activeCard.region.country]}
+                    alt={activeCard.region.country}
+                    className="h-3 w-4 rounded-[1px] object-cover shrink-0"
                   />
                 )}
-                <span>{tooltipData.geo.node.name}</span>
-                <span
-                  className={cn(
-                    "size-1.5 rounded-[0.5px]",
-                    tooltipData.geo.node.online ? "bg-online" : "bg-muted-foreground"
-                  )}
-                />
+                <span className="truncate">
+                  {activeCard.region.city}, {activeCard.region.country}
+                </span>
+                <span className="ml-auto text-[10px] font-mono text-muted-foreground shrink-0">
+                  共 {activeCard.region.total} 台
+                </span>
               </div>
-              <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
-                <span>
-                  {tooltipData.geo.city}, {tooltipData.geo.country}
-                </span>
-                <span>·</span>
-                <span>
-                  LAT {tooltipData.geo.lat.toFixed(1)}° · LON {tooltipData.geo.lng.toFixed(1)}°
-                </span>
-                {tooltipData.clusterTotal > 1 && (
-                  <>
-                    <span>·</span>
-                    <span className="text-foreground/90 font-medium">
-                      同地区 {tooltipData.clusterIndex + 1}/{tooltipData.clusterTotal}
+
+              {/* 节点列表：主机名 + 在线状态（一个绿色的点点） */}
+              <div className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-0.5">
+                {activeCard.region.nodes.map((node) => (
+                  <div
+                    key={node.id}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onOpenNode(node.id)
+                    }}
+                    className="group flex items-center justify-between gap-3 rounded-[2px] px-1.5 py-1 text-xs hover:bg-muted/70 cursor-pointer transition-colors"
+                    title="点击查看此节点监控指标"
+                  >
+                    <span className="truncate font-mono text-[11px] text-foreground group-hover:text-primary transition-colors">
+                      {node.name}
                     </span>
-                  </>
-                )}
-                <span>·</span>
-                <span>{tooltipData.geo.node.online ? "在线运行" : "离线告警"}</span>
+                    <span
+                      className={cn(
+                        "size-2 shrink-0 rounded-full transition-all",
+                        node.online
+                          ? "bg-online shadow-[0_0_6px_var(--color-online)]"
+                          : "bg-muted-foreground/30"
+                      )}
+                      title={node.online ? "在线" : "离线"}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
           )}
