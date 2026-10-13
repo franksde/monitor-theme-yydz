@@ -1,7 +1,7 @@
 {
-  "name": "默认主题",
+  "name": "一眼DZ",
   "short": "default",
-  "description": "内置状态面板，黑白配色",
+  "description": "一眼鉴定为真",
   "version": "1.0.0",
   "author": "kiusnax",
   "url": "https://github.com/kiusnax/monitor-theme-yydz",
@@ -36,4 +36,3 @@
     }
   ]
 }
-
