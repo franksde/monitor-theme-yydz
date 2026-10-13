@@ -214,6 +214,7 @@ export default function App() {
               showGlobe={config.show_globe !== false}
               showLatency={config.show_latency !== false}
               pingLines={typeof config.ping_lines === "string" ? config.ping_lines : ""}
+              offlinePlacement={typeof config.offline_placement === "string" ? config.offline_placement : "default"}
               onGroup={setGroup}
               onOpen={go}
             />
@@ -234,6 +235,7 @@ function NodeList({
   showGlobe,
   showLatency,
   pingLines,
+  offlinePlacement = "default",
   onGroup,
   onOpen,
 }: {
@@ -243,6 +245,7 @@ function NodeList({
   showGlobe: boolean
   showLatency: boolean
   pingLines: string
+  offlinePlacement?: string
   onGroup: (group: string | null) => void
   onOpen: (id: number) => void
 }) {
@@ -350,14 +353,24 @@ function NodeList({
         </div>
       )}
 
-      {/* 节点卡片列表网格 */}
+      {/* 节点卡片列表网格：支持默认混排、全部置后与分区分隔三种排版策略 */}
       {shown.length === 0 ? (
         <div className="py-20 text-center text-xs text-muted-foreground animate-fade-in">
           {selectedRegion ? "该地区暂无符合条件的节点" : "还没有接入任何节点"}
         </div>
+      ) : offlinePlacement === "separate" ? (
+        <SeparateNodeGrids
+          nodes={shown}
+          showLatency={showLatency}
+          pingLines={pingLines}
+          onOpen={onOpen}
+        />
       ) : (
-        <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {shown.map((n) => (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {(offlinePlacement === "bottom"
+            ? [...shown.filter((n) => n.online), ...shown.filter((n) => !n.online)]
+            : shown
+          ).map((n) => (
             <NodeCard
               key={n.id}
               node={n}
@@ -369,6 +382,75 @@ function NodeList({
         </div>
       )}
     </>
+  )
+}
+
+/**
+ * 离线与在线节点分区分隔渲染网格
+ */
+function SeparateNodeGrids({
+  nodes,
+  showLatency,
+  pingLines,
+  onOpen,
+}: {
+  nodes: Node[]
+  showLatency: boolean
+  pingLines: string
+  onOpen: (id: number) => void
+}) {
+  const online = nodes.filter((n) => n.online)
+  const offline = nodes.filter((n) => !n.online)
+
+  return (
+    <div className="space-y-6">
+      {/* 1. 在线节点网格 */}
+      {online.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {online.map((n) => (
+            <NodeCard
+              key={n.id}
+              node={n}
+              showLatency={showLatency}
+              pingLines={pingLines}
+              onOpen={() => onOpen(n.id)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* 2. 离线节点分隔栏与网格 */}
+      {offline.length > 0 && (
+        <div className="space-y-3 pt-1">
+          <div className="flex items-center justify-between rounded-[2px] border border-border/70 bg-card/60 px-3.5 py-2.5 text-xs shadow-2xs backdrop-blur-xs">
+            <div className="flex items-center gap-2">
+              <span className="size-1.5 rounded-[1px] bg-offline" />
+              <span className="font-semibold tracking-tight text-foreground">
+                离线节点
+              </span>
+              <span className="tnum rounded-[1px] bg-muted/80 px-1.5 py-0.5 text-xs font-mono font-medium text-muted-foreground">
+                {offline.length} 台
+              </span>
+            </div>
+            <span className="text-xs font-mono text-muted-foreground">
+              暂时断开通信或待部署
+            </span>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {offline.map((n) => (
+              <NodeCard
+                key={n.id}
+                node={n}
+                showLatency={showLatency}
+                pingLines={pingLines}
+                onOpen={() => onOpen(n.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

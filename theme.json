@@ -33,6 +33,18 @@
       "label": "显示的延迟测试条目",
       "default": "",
       "help": "每行一个 ping 任务名称（如电信、联通、移动），或用逗号/分号分隔；留空则自动按顺序展示前 3 项"
+    },
+    {
+      "key": "offline_placement",
+      "type": "select",
+      "label": "离线节点排版",
+      "default": "default",
+      "options": [
+        { "label": "默认显示 (按默认顺序混排)", "value": "default" },
+        { "label": "全部置后 (排在所有在线节点之后)", "value": "bottom" },
+        { "label": "分区分隔显示 (在底部单设区域展示)", "value": "separate" }
+      ],
+      "help": "控制离线与未接入服务器在首页节点卡片网格中的展示位置与呈现策略"
     }
   ]
 }

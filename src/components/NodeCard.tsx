@@ -166,39 +166,39 @@ export function NodeCard({
   return (
     <Card
       onClick={onOpen}
-      className="group min-w-0 cursor-pointer gap-0 rounded-[2px] border border-border/80 bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/40 hover:shadow-md active:translate-y-0"
+      className="group flex h-full flex-col justify-between min-w-0 cursor-pointer gap-0 rounded-[2px] border border-border/80 bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/40 hover:shadow-md active:translate-y-0"
       role="button"
       tabIndex={0}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpen())}
     >
-      {/* 头部：节点名称、国家与状态 */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <Country node={node} />
-            <h3 className="truncate font-semibold tracking-tight transition-colors group-hover:text-foreground" title={node.name}>
-              {node.name}
-            </h3>
+      <div>
+        {/* 头部：节点名称、国家与状态 */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <Country node={node} />
+              <h3 className="truncate font-semibold tracking-tight transition-colors group-hover:text-foreground" title={node.name}>
+                {node.name}
+              </h3>
+            </div>
+            <p className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+              {node.os && <OsIcon os={node.os} />}
+              <span className="truncate">
+                {node.os
+                  ? [node.virt !== "none" && node.virt, node.arch].filter(Boolean).join(" · ")
+                  : "等待首次上报"}
+              </span>
+            </p>
           </div>
-          <p className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-            {node.os && <OsIcon os={node.os} />}
-            <span className="truncate">
-              {node.os
-                ? [node.virt !== "none" && node.virt, node.arch].filter(Boolean).join(" · ")
-                : "等待首次上报"}
-            </span>
-          </p>
+          {/* 状态与到期时间 */}
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <Status node={node} />
+            <Expiry node={node} />
+          </div>
         </div>
-        {/* 状态与到期时间 */}
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <Status node={node} />
-          <Expiry node={node} />
-        </div>
-      </div>
 
-      {/* 资源指标度量网格 */}
-      {deployed(node) ? (
-        <>
+        {/* 资源指标度量网格：不论已部署还是待接入，均保持对齐网格结构 */}
+        {deployed(node) ? (
           <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5">
             <Meter
               label={`CPU ${node.cpu_cores} 核`}
@@ -222,34 +222,53 @@ export function NodeCard({
               foot={trafficFoot(node)}
             />
           </div>
-
-          {/* 实时网速与累计流量横栏 */}
-          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-1.5 border-t border-border/60 pt-3 text-xs">
-            <span className="tnum inline-flex items-center gap-1 font-medium text-foreground">
-              <ArrowDown className="size-3 text-muted-foreground" />
-              {m ? rate(m.net_rx) : "—"}
-            </span>
-            <span className="tnum inline-flex items-center gap-1 font-medium text-foreground">
-              <ArrowUp className="size-3 text-muted-foreground" />
-              {m ? rate(m.net_tx) : "—"}
-            </span>
-            <span className="tnum inline-flex items-center gap-1 text-xs text-muted-foreground font-mono">
-              <ArrowDown className="size-3 opacity-80" />
-              {bytes(node.total_rx)}
-            </span>
-            <span className="tnum inline-flex items-center gap-1 text-xs text-muted-foreground font-mono">
-              <ArrowUp className="size-3 opacity-80" />
-              {bytes(node.total_tx)}
-            </span>
+        ) : (
+          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5">
+            <Meter label="CPU 核心" pct={null} foot="未就绪" />
+            <Meter label="内存" pct={null} foot="未就绪" />
+            <Meter label="硬盘" pct={null} foot="未就绪" />
+            <Meter label="流量" pct={null} empty={FOREVER} foot="未就绪" />
           </div>
+        )}
 
-          {/* 网络延迟测试数据条目 */}
-          <LatencySection node={node} pingLines={pingLines} enabled={showLatency} />
-        </>
+        {/* 实时网速与累计流量横栏 */}
+        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-1.5 border-t border-border/60 pt-3 text-xs">
+          <span className="tnum inline-flex items-center gap-1 font-medium text-foreground">
+            <ArrowDown className="size-3 text-muted-foreground" />
+            {m ? rate(m.net_rx) : "—"}
+          </span>
+          <span className="tnum inline-flex items-center gap-1 font-medium text-foreground">
+            <ArrowUp className="size-3 text-muted-foreground" />
+            {m ? rate(m.net_tx) : "—"}
+          </span>
+          <span className="tnum inline-flex items-center gap-1 text-xs text-muted-foreground font-mono">
+            <ArrowDown className="size-3 opacity-80" />
+            {deployed(node) ? bytes(node.total_rx) : "—"}
+          </span>
+          <span className="tnum inline-flex items-center gap-1 text-xs text-muted-foreground font-mono">
+            <ArrowUp className="size-3 opacity-80" />
+            {deployed(node) ? bytes(node.total_tx) : "—"}
+          </span>
+        </div>
+      </div>
+
+      {/* 底部功能区：网络延迟测试条目或接入指引（高度严格对齐） */}
+      {deployed(node) ? (
+        <LatencySection node={node} pingLines={pingLines} enabled={showLatency} />
+      ) : showLatency ? (
+        <div className="mt-3.5 space-y-1.5 border-t border-border/60 pt-2.5">
+          <div className="flex items-center justify-between text-xs font-mono font-medium text-muted-foreground pb-0.5">
+            <span>接入状态</span>
+            <span>配置指引</span>
+          </div>
+          <div className="flex h-[76px] items-center justify-center rounded-[2px] border border-dashed border-border/60 bg-muted/15 px-3 text-center text-xs leading-relaxed text-muted-foreground">
+            <span>主机尚未接入 · 请在后台获取命令并在主机执行</span>
+          </div>
+        </div>
       ) : (
-        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-          还没有接入。在后台生成安装命令并在目标主机执行一次。
-        </p>
+        <div className="mt-3 border-t border-border/50 pt-2 text-xs leading-relaxed text-muted-foreground">
+          <span>主机尚未接入 · 请在后台获取命令并在主机执行</span>
+        </div>
       )}
     </Card>
   )

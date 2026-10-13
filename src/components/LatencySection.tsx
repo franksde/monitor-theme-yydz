@@ -119,23 +119,69 @@ export function LatencySection({
     return pickPingRows(allProbes || [], pingLines, 3)
   }, [allProbes, pingLines])
 
-  if (!enabled || !node.online) return null
+  if (!enabled) return null
 
-  // 加载中占位微骨架
-  if (loading && rows.length === 0) {
+  // 离线节点展示对齐的工控状态占位，保持卡片物理高度完全对称统一
+  if (!node.online) {
     return (
-      <div className="mt-3.5 space-y-1.5 border-t border-border/50 pt-2.5">
-        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span className="h-2.5 w-12 rounded-[1px] bg-muted/40 animate-pulse" />
-          <span className="h-2.5 w-16 rounded-[1px] bg-muted/40 animate-pulse" />
-          <span className="h-2.5 w-8 rounded-[1px] bg-muted/40 animate-pulse" />
+      <div className="mt-3.5 space-y-1.5 border-t border-border/60 pt-2.5">
+        <div className="flex items-center justify-between text-xs font-mono font-medium text-muted-foreground pb-0.5">
+          <span>网络延迟</span>
+          <span>监测状态</span>
+        </div>
+        <div className="flex h-[76px] items-center justify-center rounded-[2px] border border-dashed border-border/60 bg-muted/15 px-3 text-center text-xs font-mono text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span className="size-1.5 rounded-[1px] bg-offline" />
+            <span>节点处于离线状态 · 延迟监测挂起</span>
+          </span>
         </div>
       </div>
     )
   }
 
-  // 没有任何 ping 测试条目时静默隐藏
-  if (rows.length === 0) return null
+  // 加载中占位微骨架：保持 h-[76px] 恒定高度，避免加载完成后卡片高度跳动
+  if (loading && rows.length === 0) {
+    return (
+      <div className="mt-3.5 space-y-1.5 border-t border-border/50 pt-2.5">
+        <div className="flex items-center justify-between text-xs font-mono font-medium text-muted-foreground pb-0.5">
+          <span className="h-3 w-14 rounded-[1px] bg-muted/40 animate-pulse" />
+          <span className="h-3 w-20 rounded-[1px] bg-muted/40 animate-pulse" />
+        </div>
+        <div className="flex h-[76px] flex-col justify-around py-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="h-2.5 w-12 rounded-[1px] bg-muted/40 animate-pulse" />
+            <span className="h-2.5 flex-1 max-w-[80px] rounded-[1px] bg-muted/30 animate-pulse" />
+            <span className="h-2.5 w-10 rounded-[1px] bg-muted/40 animate-pulse" />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="h-2.5 w-12 rounded-[1px] bg-muted/40 animate-pulse" />
+            <span className="h-2.5 flex-1 max-w-[80px] rounded-[1px] bg-muted/30 animate-pulse" />
+            <span className="h-2.5 w-10 rounded-[1px] bg-muted/40 animate-pulse" />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="h-2.5 w-12 rounded-[1px] bg-muted/40 animate-pulse" />
+            <span className="h-2.5 flex-1 max-w-[80px] rounded-[1px] bg-muted/30 animate-pulse" />
+            <span className="h-2.5 w-10 rounded-[1px] bg-muted/40 animate-pulse" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // 没有任何 ping 测试条目时展示对齐的工控占位说明
+  if (rows.length === 0) {
+    return (
+      <div className="mt-3.5 space-y-1.5 border-t border-border/60 pt-2.5">
+        <div className="flex items-center justify-between text-xs font-mono font-medium text-muted-foreground pb-0.5">
+          <span>网络延迟</span>
+          <span>监测状态</span>
+        </div>
+        <div className="flex h-[76px] items-center justify-center rounded-[2px] border border-dashed border-border/50 bg-muted/10 px-3 text-center text-xs font-mono text-muted-foreground/80">
+          <span>暂无配置延迟探测任务</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="mt-3.5 space-y-1.5 border-t border-border/60 pt-2.5">
@@ -144,7 +190,7 @@ export function LatencySection({
         <span>1H 走势 · 丢包</span>
       </div>
 
-      <div className="space-y-1">
+      <div className="flex min-h-[76px] flex-col justify-around space-y-1">
         {rows.map((probe) => {
           const ms = probe.latestMs
           const loss = probe.loss

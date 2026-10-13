@@ -12,7 +12,17 @@ export function loadConfig(): Promise<Record<string, unknown>> {
   // option and min/max checks the panel applies.
   const pick = (saved: Record<string, unknown>) =>
     Object.fromEntries(
-      manifest.config.map((f) => [f.key, typeof saved[f.key] === typeof f.default ? saved[f.key] : f.default]),
+      manifest.config.map((f) => {
+        const val = saved[f.key]
+        if (typeof val === typeof f.default) {
+          if ("options" in f && Array.isArray(f.options)) {
+            const valid = (f.options as Array<{ value: unknown }>).some((o) => o.value === val)
+            return [f.key, valid ? val : f.default]
+          }
+          return [f.key, val]
+        }
+        return [f.key, f.default]
+      }),
     )
   return api<Record<string, unknown>>(`/themes/${manifest.short}/config`).then(pick).catch(() => pick({}))
 }
