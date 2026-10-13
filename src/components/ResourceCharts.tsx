@@ -613,6 +613,9 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                     outerRadius={54}
                     stroke="var(--color-card)"
                     strokeWidth={2}
+                    isAnimationActive={true}
+                    animationDuration={350}
+                    animationEasing="ease-out"
                   >
                     {ramPieData.map((entry, index) => (
                       <Cell key={`ram-cell-${index}`} fill={entry.color} />
@@ -662,6 +665,9 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                     outerRadius={54}
                     stroke="var(--color-card)"
                     strokeWidth={2}
+                    isAnimationActive={true}
+                    animationDuration={350}
+                    animationEasing="ease-out"
                   >
                     {diskPieData.map((entry, index) => (
                       <Cell key={`disk-cell-${index}`} fill={entry.color} />
@@ -711,6 +717,9 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                     outerRadius={54}
                     stroke="var(--color-card)"
                     strokeWidth={2}
+                    isAnimationActive={true}
+                    animationDuration={350}
+                    animationEasing="ease-out"
                   >
                     {trafficPieData.map((entry, index) => (
                       <Cell key={`trf-cell-${index}`} fill={entry.color} />

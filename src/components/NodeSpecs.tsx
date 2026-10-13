@@ -60,9 +60,9 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
   return (
     <div className="space-y-3.5">
       {/* 1. 顶部全景控制栏：国旗、节点名称、在线指示灯、Agent 版本、地理坐标与实时遥测指标胶囊 */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[2px] border border-border/80 bg-card/80 p-3.5 shadow-2xs backdrop-blur-xs">
+      <div className="flex flex-col gap-3 rounded-[2px] border border-border/80 bg-card/80 p-3 shadow-2xs backdrop-blur-xs sm:p-3.5 lg:flex-row lg:items-center lg:justify-between">
         {/* 左侧：主机标识与属性徽章 */}
-        <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-2.5">
           <Country node={node} />
           <h2 className="truncate text-lg font-bold tracking-tight text-foreground" title={node.name}>
             {node.name}
@@ -89,53 +89,61 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
         </div>
 
         {/* 右侧：实时关键遥测指标胶囊（运行时长、负载、实时网络速率） */}
-        {/* 采用恒定槽位宽度与等宽数字设计，彻底杜绝数据高频刷新时引起的抖动与折行跳跃 */}
-        <div className="flex flex-wrap items-center gap-2 text-xs shrink-0">
-          {/* 1. 运行时间胶囊 */}
-          <div
-            className="flex h-7 min-w-[144px] items-center justify-between gap-2 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border"
-            title="系统连续运行时间"
-          >
-            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
-              <Clock className="size-3 text-muted-foreground/80 shrink-0" />
-              <span>运行</span>
+        {/* 适配手机端（自适应流式排版、无水平溢出）与桌面端（恒定槽位宽度防抖） */}
+        <div className="flex w-full min-w-0 flex-col gap-2 text-xs sm:flex-row sm:flex-wrap sm:items-center lg:w-auto">
+          {/* 运行与负载胶囊区域 */}
+          <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
+            {/* 1. 运行时间胶囊 */}
+            <div
+              className="flex h-7 min-w-0 flex-1 items-center justify-between gap-1.5 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border sm:flex-initial sm:min-w-[136px]"
+              title="系统连续运行时间"
+            >
+              <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
+                <Clock className="size-3 text-muted-foreground/80 shrink-0" />
+                <span>运行</span>
+              </div>
+              <span className="tnum font-mono text-xs font-medium text-foreground text-right shrink-0 whitespace-nowrap">
+                {m && m.uptime > 0 ? uptime(m.uptime) : "—"}
+              </span>
             </div>
-            <span className="tnum font-mono text-xs font-medium text-foreground text-right min-w-[76px] shrink-0 whitespace-nowrap">
-              {m && m.uptime > 0 ? uptime(m.uptime) : "—"}
-            </span>
+
+            {/* 2. 系统负载胶囊 */}
+            <div
+              className="flex h-7 min-w-0 flex-[1.4] items-center justify-between gap-1.5 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border sm:flex-initial sm:min-w-[185px]"
+              title="系统 1 / 5 / 15 分钟平均负载"
+            >
+              <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
+                <Activity className="size-3 text-muted-foreground/80 shrink-0" />
+                <span>负载</span>
+              </div>
+              <span className="tnum font-mono text-xs font-medium text-foreground text-right shrink-0 whitespace-nowrap">
+                {m?.load ? m.load.map((l) => l.toFixed(2)).join(" / ") : "— / — / —"}
+              </span>
+            </div>
           </div>
 
-          {/* 2. 系统负载胶囊 */}
+          {/* 3. 实时网络吞吐胶囊 */}
           <div
-            className="flex h-7 min-w-[200px] items-center justify-between gap-2 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border"
-            title="系统 1 / 5 / 15 分钟平均负载"
-          >
-            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
-              <Activity className="size-3 text-muted-foreground/80 shrink-0" />
-              <span>负载</span>
-            </div>
-            <span className="tnum font-mono text-xs font-medium text-foreground text-right min-w-[130px] shrink-0 whitespace-nowrap">
-              {m?.load ? m.load.map((l) => l.toFixed(2)).join(" / ") : "— / — / —"}
-            </span>
-          </div>
-
-          {/* 3. 实时网络吞吐胶囊：下行与上行分置固定宽度槽位，彻底消除数值变化推挤抖动 */}
-          <div
-            className="flex h-7 items-center gap-2 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border"
+            className="flex h-7 w-full min-w-0 items-center justify-between gap-2 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border sm:w-auto sm:justify-start"
             title="实时网络吞吐速率 (下行 / 上行)"
           >
-            <div className="flex items-center gap-1 shrink-0">
-              <ArrowDown className="size-3 text-muted-foreground/80 shrink-0" />
-              <span className="tnum font-mono text-xs font-medium text-foreground text-right w-[70px] shrink-0 whitespace-nowrap">
-                {m ? rate(m.net_rx) : "0 B/s"}
-              </span>
+            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground sm:hidden">
+              <span>网速</span>
             </div>
-            <span className="text-border/80 shrink-0 select-none">·</span>
-            <div className="flex items-center gap-1 shrink-0">
-              <ArrowUp className="size-3 text-muted-foreground/80 shrink-0" />
-              <span className="tnum font-mono text-xs font-medium text-foreground text-right w-[70px] shrink-0 whitespace-nowrap">
-                {m ? rate(m.net_tx) : "0 B/s"}
-              </span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 shrink-0">
+                <ArrowDown className="size-3 text-muted-foreground/80 shrink-0" />
+                <span className="tnum font-mono text-xs font-medium text-foreground text-right shrink-0 whitespace-nowrap sm:w-[68px]">
+                  {m ? rate(m.net_rx) : "0 B/s"}
+                </span>
+              </div>
+              <span className="text-border/80 shrink-0 select-none">·</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <ArrowUp className="size-3 text-muted-foreground/80 shrink-0" />
+                <span className="tnum font-mono text-xs font-medium text-foreground text-right shrink-0 whitespace-nowrap sm:w-[68px]">
+                  {m ? rate(m.net_tx) : "0 B/s"}
+                </span>
+              </div>
             </div>
           </div>
         </div>

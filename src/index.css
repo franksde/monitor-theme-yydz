@@ -36,6 +36,11 @@
   /* 状态指示色：明快通透的在线呼吸绿与沉稳离线灰 */
   --online: oklch(0.62 0.18 145);
   --offline: oklch(0.52 0 0);
+  /* 全局精细滚动条变量（浅色模式） */
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: oklch(0.14 0 0 / 22%);
+  --scrollbar-thumb-hover: oklch(0.14 0 0 / 45%);
+  --scrollbar-thumb-active: oklch(0.14 0 0 / 65%);
 }
 
 /* ==========================================================================
@@ -68,6 +73,11 @@
   /* 深色下通透发光的在线绿与离线哑光灰 */
   --online: oklch(0.72 0.19 145);
   --offline: oklch(0.45 0 0);
+  /* 全局精细滚动条变量（深色模式） */
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: oklch(1 0 0 / 22%);
+  --scrollbar-thumb-hover: oklch(1 0 0 / 45%);
+  --scrollbar-thumb-active: oklch(1 0 0 / 65%);
 }
 
 @theme inline {
@@ -104,7 +114,33 @@
 }
 
 @layer base {
-  * { @apply border-border outline-ring/50; }
+  * {
+    @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+  /* 全局精细工控滚动条：纵向宽度与横向高度适中 (6px)，微倒角 (2px)，清晰可见且不占用过多视觉空间 */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    border-radius: 2px;
+    transition: background-color 150ms ease;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+  ::-webkit-scrollbar-thumb:active {
+    background-color: var(--scrollbar-thumb-active);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
   /* 全局字体渲染平滑度与优化排版 */
   html {
     font-family: var(--font-sans);
