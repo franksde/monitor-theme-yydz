@@ -627,13 +627,13 @@ export function NodeDetailSkeleton() {
       {/* 3. 详情监控主视图控制栏（与 NodeDetail 控制栏 1:1 对齐） */}
       <div className="space-y-2.5 border-t border-border/70 pt-3.5">
         <div className="flex flex-wrap items-center justify-between gap-2.5">
-          {/* 标签页选择器 */}
+          {/* 标签页选择器（与真实 NodeDetail TABS: '资源' / '网络延迟' 1:1 完全对齐） */}
           <div className="flex items-center gap-1 rounded-[2px] border border-border/70 bg-muted/40 p-0.5">
             <div className="rounded-[1px] px-3 py-1 text-xs font-semibold bg-primary text-primary-foreground shadow-2xs">
-              系统资源监控
+              资源
             </div>
             <div className="rounded-[1px] px-3 py-1 text-xs font-medium text-muted-foreground">
-              网络延迟质量
+              网络延迟
             </div>
           </div>
 
