@@ -2,9 +2,9 @@
   "name": "默认主题",
   "short": "default",
   "description": "内置状态面板，黑白配色",
-  "version": "1.4.0",
-  "author": "stqfdyr",
-  "url": "https://github.com/monitor-probe/monitor-theme-default",
+  "version": "1.0.0",
+  "author": "kiusnax",
+  "url": "https://github.com/kiusnax/monitor-theme-yydz",
   "config": [
     {
       "key": "show_summary",
