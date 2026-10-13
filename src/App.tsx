@@ -336,8 +336,8 @@ function NodeList({
         />
       )}
 
-      {/* 四格关键指标汇总 */}
-      {summary && <Summary nodes={shown} group={current} />}
+      {/* 全局与分组关键指标看板（包含硬件规格、网络带宽、费用累计与到期时间排行榜） */}
+      {summary && <Summary nodes={shown} group={current} onOpen={onOpen} />}
 
       {/* 地区过滤状态提示条 */}
       {selectedRegion && (
