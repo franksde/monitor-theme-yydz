@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 
-import { Skeleton } from "@/components/ui/skeleton"
+import { DetailChartSkeleton } from "@/components/NodeDetailSkeleton"
 import { api, type Node } from "@/lib/api"
 import { windows } from "@/lib/format"
 import { NodeSpecs } from "@/components/NodeSpecs"
@@ -167,10 +167,7 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
 
       {/* 3. 遥测核心展示区 */}
       {!data ? (
-        <div className="space-y-3 py-4">
-          <Skeleton className="h-10 w-full rounded-[2px]" />
-          <Skeleton className="h-64 w-full rounded-[2px]" />
-        </div>
+        <DetailChartSkeleton tab={tab} />
       ) : failed ? (
         <div
           className="rounded-[2px] border border-destructive/30 bg-destructive/5 py-8 text-center text-sm text-destructive"

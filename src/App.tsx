@@ -6,6 +6,7 @@ import { NodeCard } from "@/components/NodeCard"
 import { Summary } from "@/components/Summary"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { NodeDetailSkeleton } from "@/components/NodeDetailSkeleton"
 import { api, groupsOf, useNodes, type Node } from "@/lib/api"
 import { loadConfig } from "@/lib/config"
 import { resolveNodeGeo } from "@/lib/geo"
@@ -186,9 +187,9 @@ export default function App() {
         {/* 详情页路由视图 vs 节点主列表视图 */}
         {open !== null ? (
           !nodes ? (
-            <Skeleton className="h-96" />
+            <NodeDetailSkeleton />
           ) : selected ? (
-            <Suspense fallback={<Skeleton className="h-96" />}>
+            <Suspense fallback={<NodeDetailSkeleton />}>
               <NodeDetail node={selected} historyDays={me.history_days ?? 7} />
             </Suspense>
           ) : (

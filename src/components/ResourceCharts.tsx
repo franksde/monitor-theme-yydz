@@ -123,7 +123,7 @@ function CustomPieTooltip({ active, payload, total, unitFormatter = bytes }: Pie
   const pct = total && total > 0 ? ((val / total) * 100).toFixed(1) : null
 
   return (
-    <div className="min-w-[130px] rounded-[2px] border border-border/80 bg-card/95 px-3 py-2 text-xs shadow-xl backdrop-blur-xs select-none pointer-events-none z-50">
+    <div className="min-w-[130px] rounded-[2px] border border-border/80 bg-card/95 px-3 py-2 text-xs shadow-xl backdrop-blur-xs select-none pointer-events-none z-50 animate-fade-in">
       <div className="flex items-center gap-1.5 font-medium text-foreground">
         <span
           className="size-2 rounded-[0.5px] shrink-0"
@@ -603,6 +603,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                   <Tooltip
                     content={<CustomPieTooltip total={node.mem_total} />}
                     allowEscapeViewBox={{ x: true, y: true }}
+                    isAnimationActive={false}
                     wrapperStyle={{ zIndex: 1000, pointerEvents: "none" }}
                   />
                   <Pie
@@ -655,6 +656,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                   <Tooltip
                     content={<CustomPieTooltip total={node.disk_total} />}
                     allowEscapeViewBox={{ x: true, y: true }}
+                    isAnimationActive={false}
                     wrapperStyle={{ zIndex: 1000, pointerEvents: "none" }}
                   />
                   <Pie
@@ -707,6 +709,7 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
                   <Tooltip
                     content={<CustomPieTooltip total={trafficPieData[0].value + trafficPieData[1].value} />}
                     allowEscapeViewBox={{ x: true, y: true }}
+                    isAnimationActive={false}
                     wrapperStyle={{ zIndex: 1000, pointerEvents: "none" }}
                   />
                   <Pie
