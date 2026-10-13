@@ -154,19 +154,19 @@ export default function App() {
             className="flex items-center gap-2 font-bold tracking-tight text-foreground transition-opacity hover:opacity-75 active:scale-[0.99]"
             onClick={() => go(null)}
           >
-            <span className="flex size-4.5 items-center justify-center rounded-[2px] bg-foreground text-[10px] font-black text-background">
-              M
-            </span>
+            <img src="/favicon.svg" alt="Logo" className="size-4.5 shrink-0" />
             <span>{me.site_name || "Monitor"}</span>
           </button>
           <div className="flex-1" />
-          {/* 管理后台入口 */}
-          <Button variant="ghost" size="sm" asChild className="text-xs">
-            <a href="/admin/">
-              <Wrench className="size-3.5" />
-              <span>{me.authed ? "进入后台" : "登录"}</span>
-            </a>
-          </Button>
+          {/* 管理后台入口：仅在已登录状态时展示 */}
+          {me.authed && (
+            <Button variant="ghost" size="sm" asChild className="text-xs">
+              <a href="/admin/">
+                <Wrench className="size-3.5" />
+                <span>进入后台</span>
+              </a>
+            </Button>
+          )}
           {/* 深浅色模式切换按钮 */}
           <Button variant="ghost" size="icon" onClick={toggleTheme} title="切换主题" className="size-8">
             {dark ? <Sun className="size-4 text-warn" /> : <Moon className="size-4" />}
