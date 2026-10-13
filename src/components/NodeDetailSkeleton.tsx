@@ -33,34 +33,34 @@ export function DetailChartSkeleton({ tab = "resources" }: { tab?: "resources" |
   if (tab === "latency") {
     return (
       <div className="space-y-4 animate-fade-in">
-        {/* 顶部控制栏与视图切换（真实样式为平面下划线分隔栏，非卡片包裹） */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 pb-2.5">
-          <div className="flex items-center gap-2">
-            <Wifi className="size-4 text-primary" />
-            <span className="font-semibold text-foreground text-xs">网络延迟拓扑测控</span>
-            <Badge className="h-4.5 rounded-[1px] px-1.5 text-[11px] font-mono text-muted-foreground border-border/60">
+        {/* 顶部控制栏与视图切换（移动端响应式分行与防文字折行） */}
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between border-b border-border/50 pb-2.5">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <Wifi className="size-4 text-primary shrink-0" />
+            <span className="font-semibold text-foreground text-xs whitespace-nowrap">网络延迟拓扑测控</span>
+            <Badge className="h-4.5 rounded-[1px] px-1.5 text-[11px] font-mono text-muted-foreground border-border/60 shrink-0">
               4 条测试线路
             </Badge>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground select-none opacity-70">
+          <div className="flex items-center justify-between sm:justify-end gap-3 flex-wrap">
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground select-none opacity-70 shrink-0">
               <input type="checkbox" disabled className="accent-foreground rounded-[1px]" />
-              <span>智能削峰</span>
+              <span className="whitespace-nowrap">智能削峰</span>
             </label>
 
-            <div className="flex items-center gap-1 rounded-[2px] border border-border/60 bg-muted/30 p-0.5 text-xs">
-              <div className="flex items-center gap-1 rounded-[1px] bg-primary px-2 py-0.5 text-primary-foreground font-medium shadow-2xs">
-                <TrendingUp className="size-3" />
-                <span>聚合对比</span>
+            <div className="flex items-center gap-1 rounded-[2px] border border-border/60 bg-muted/30 p-0.5 text-xs overflow-x-auto no-scrollbar shrink-0">
+              <div className="flex items-center gap-1 rounded-[1px] bg-primary px-2 py-0.5 text-primary-foreground font-medium shadow-2xs whitespace-nowrap shrink-0">
+                <TrendingUp className="size-3 shrink-0" />
+                <span className="whitespace-nowrap">聚合对比</span>
               </div>
-              <div className="flex items-center gap-1 rounded-[1px] px-2 py-0.5 text-muted-foreground">
-                <Grid className="size-3" />
-                <span>分轨矩阵</span>
+              <div className="flex items-center gap-1 rounded-[1px] px-2 py-0.5 text-muted-foreground whitespace-nowrap shrink-0">
+                <Grid className="size-3 shrink-0" />
+                <span className="whitespace-nowrap">分轨矩阵</span>
               </div>
-              <div className="flex items-center gap-1 rounded-[1px] px-2 py-0.5 text-muted-foreground">
-                <BarChart2 className="size-3" />
-                <span>延迟排行</span>
+              <div className="flex items-center gap-1 rounded-[1px] px-2 py-0.5 text-muted-foreground whitespace-nowrap shrink-0">
+                <BarChart2 className="size-3 shrink-0" />
+                <span className="whitespace-nowrap">延迟排行</span>
               </div>
             </div>
           </div>
@@ -136,32 +136,32 @@ export function DetailChartSkeleton({ tab = "resources" }: { tab?: "resources" |
 
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* 视图模式切换胶囊（真实样式为平面下划线分隔栏，非卡片包裹） */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2.5">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Activity className="size-3.5 text-primary" />
-          <span className="font-semibold text-foreground">主机资源分析测控</span>
-          <span className="text-xs text-muted-foreground font-medium">
+      {/* 视图模式切换胶囊（移动端响应式分行与防文字折行） */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border/50 pb-2.5">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+          <Activity className="size-3.5 text-primary shrink-0" />
+          <span className="font-semibold text-foreground whitespace-nowrap">主机资源分析测控</span>
+          <span className="text-xs text-muted-foreground font-medium truncate">
             · 遥测历史窗口
           </span>
         </div>
 
-        <div className="flex items-center gap-1 rounded-[2px] border border-border/60 bg-muted/30 p-0.5 text-xs">
-          <div className="flex items-center gap-1 rounded-[1px] px-2 py-0.5 bg-primary text-primary-foreground font-medium shadow-2xs">
-            <Activity className="size-3" />
-            <span>全景仪表</span>
+        <div className="flex items-center gap-1 rounded-[2px] border border-border/60 bg-muted/30 p-0.5 text-xs overflow-x-auto no-scrollbar max-w-full shrink-0">
+          <div className="flex items-center justify-center gap-1 rounded-[1px] px-2 py-0.5 bg-primary text-primary-foreground font-medium shadow-2xs whitespace-nowrap shrink-0">
+            <Activity className="size-3 shrink-0" />
+            <span className="whitespace-nowrap">全景仪表</span>
           </div>
-          <div className="flex items-center gap-1 rounded-[1px] px-2 py-0.5 text-muted-foreground">
-            <TrendingUp className="size-3" />
-            <span>时序曲线</span>
+          <div className="flex items-center justify-center gap-1 rounded-[1px] px-2 py-0.5 text-muted-foreground whitespace-nowrap shrink-0">
+            <TrendingUp className="size-3 shrink-0" />
+            <span className="whitespace-nowrap">时序曲线</span>
           </div>
-          <div className="flex items-center gap-1 rounded-[1px] px-2 py-0.5 text-muted-foreground">
-            <Flame className="size-3" />
-            <span>负载热力</span>
+          <div className="flex items-center justify-center gap-1 rounded-[1px] px-2 py-0.5 text-muted-foreground whitespace-nowrap shrink-0">
+            <Flame className="size-3 shrink-0" />
+            <span className="whitespace-nowrap">负载热力</span>
           </div>
-          <div className="flex items-center gap-1 rounded-[1px] px-2 py-0.5 text-muted-foreground">
-            <PieIcon className="size-3" />
-            <span>占比饼图</span>
+          <div className="flex items-center justify-center gap-1 rounded-[1px] px-2 py-0.5 text-muted-foreground whitespace-nowrap shrink-0">
+            <PieIcon className="size-3 shrink-0" />
+            <span className="whitespace-nowrap">占比饼图</span>
           </div>
         </div>
       </div>
@@ -476,36 +476,44 @@ export function NodeDetailSkeleton() {
           <Skeleton className="h-5 w-14 rounded-[2px] hidden sm:inline-block" />
         </div>
 
-        {/* 右侧：实时关键遥测指标胶囊（真实呈现 '运行'、'负载'、'网速' 胶囊尺寸与图标） */}
-        <div className="flex w-full min-w-0 flex-col gap-2 text-xs sm:flex-row sm:flex-wrap sm:items-center lg:w-auto">
-          <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
-            {/* 运行时间胶囊 */}
-            <div className="flex h-7 min-w-0 flex-1 items-center justify-between gap-1.5 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs sm:flex-initial sm:min-w-[136px]">
-              <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
-                <Clock className="size-3 text-muted-foreground/80 shrink-0" />
-                <span>运行</span>
-              </div>
-              <Skeleton className="h-3.5 w-14 rounded-[1px]" />
+        {/* 右侧：实时关键遥测指标胶囊（移动端单列全宽自适应，桌面端水平排列防抖） */}
+        <div className="grid w-full grid-cols-1 gap-2 text-xs sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+          {/* 1. 运行时间胶囊 */}
+          <div
+            className="flex h-7 w-full items-center justify-between gap-1.5 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs sm:w-auto sm:min-w-[136px]"
+            title="系统连续运行时间"
+          >
+            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
+              <Clock className="size-3 text-muted-foreground/80 shrink-0" />
+              <span>运行</span>
             </div>
-
-            {/* 系统负载胶囊 */}
-            <div className="flex h-7 min-w-0 flex-[1.4] items-center justify-between gap-1.5 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs sm:flex-initial sm:min-w-[185px]">
-              <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
-                <Activity className="size-3 text-muted-foreground/80 shrink-0" />
-                <span>负载</span>
-              </div>
-              <Skeleton className="h-3.5 w-24 rounded-[1px]" />
-            </div>
+            <Skeleton className="h-3.5 w-14 rounded-[1px]" />
           </div>
 
-          {/* 实时网速吞吐胶囊 */}
-          <div className="flex h-7 w-full min-w-0 items-center justify-between gap-2 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs sm:w-auto sm:justify-start">
-            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground sm:hidden">
+          {/* 2. 系统负载胶囊 */}
+          <div
+            className="flex h-7 w-full items-center justify-between gap-1.5 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs sm:w-auto sm:min-w-[185px]"
+            title="系统 1 / 5 / 15 分钟平均负载"
+          >
+            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
+              <Activity className="size-3 text-muted-foreground/80 shrink-0" />
+              <span>负载</span>
+            </div>
+            <Skeleton className="h-3.5 w-24 rounded-[1px]" />
+          </div>
+
+          {/* 3. 实时网络吞吐胶囊 */}
+          <div
+            className="flex h-7 w-full items-center justify-between gap-2 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs sm:w-auto sm:justify-start"
+            title="实时网络吞吐速率 (下行 / 上行)"
+          >
+            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
+              <ArrowDown className="size-3 text-muted-foreground/80 shrink-0 hidden sm:inline" />
               <span>网速</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1 shrink-0">
-                <ArrowDown className="size-3 text-muted-foreground/80 shrink-0" />
+                <ArrowDown className="size-3 text-muted-foreground/80 shrink-0 sm:hidden" />
                 <Skeleton className="h-3.5 w-12 rounded-[1px]" />
               </div>
               <span className="text-border/80 shrink-0 select-none">·</span>
@@ -624,25 +632,25 @@ export function NodeDetailSkeleton() {
         </div>
       </div>
 
-      {/* 3. 详情监控主视图控制栏（与 NodeDetail 控制栏 1:1 对齐） */}
+      {/* 3. 详情监控主视图控制栏（与 NodeDetail 控制栏 1:1 对齐，移动端响应式防换行） */}
       <div className="space-y-2.5 border-t border-border/70 pt-3.5">
-        <div className="flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           {/* 标签页选择器（与真实 NodeDetail TABS: '资源' / '网络延迟' 1:1 完全对齐） */}
-          <div className="flex items-center gap-1 rounded-[2px] border border-border/70 bg-muted/40 p-0.5">
-            <div className="rounded-[1px] px-3 py-1 text-xs font-semibold bg-primary text-primary-foreground shadow-2xs">
+          <div className="flex items-center gap-1 rounded-[2px] border border-border/70 bg-muted/40 p-0.5 shrink-0 self-start">
+            <div className="rounded-[1px] px-3 py-1 text-xs font-semibold bg-primary text-primary-foreground shadow-2xs whitespace-nowrap shrink-0">
               资源
             </div>
-            <div className="rounded-[1px] px-3 py-1 text-xs font-medium text-muted-foreground">
+            <div className="rounded-[1px] px-3 py-1 text-xs font-medium text-muted-foreground whitespace-nowrap shrink-0">
               网络延迟
             </div>
           </div>
 
-          {/* 时间跨度窗口选择器 */}
-          <div className="flex flex-wrap items-center gap-1">
+          {/* 时间跨度窗口选择器（支持平滑滚动，禁止折行） */}
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full shrink-0">
             {["1 小时", "6 小时", "24 小时", "3 天", "7 天"].map((label, idx) => (
               <div
                 key={label}
-                className={`rounded-[2px] py-1 text-xs font-medium px-1.5 sm:px-2.5 ${
+                className={`rounded-[2px] py-1 text-xs font-medium px-1.5 sm:px-2.5 whitespace-nowrap shrink-0 ${
                   idx === 1
                     ? "bg-primary text-primary-foreground shadow-2xs font-semibold"
                     : "text-muted-foreground"

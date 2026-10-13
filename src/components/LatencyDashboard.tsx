@@ -271,75 +271,75 @@ export function LatencyDashboard({
 
   return (
     <div className="space-y-4">
-      {/* 顶部控制栏与视图切换 */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 pb-2.5">
-        <div className="flex items-center gap-2">
-          <Wifi className="size-4 text-primary" />
-          <span className="font-semibold text-foreground text-xs">网络延迟拓扑测控</span>
-          <Badge className="h-4.5 rounded-[1px] px-1.5 text-[11px] font-mono text-muted-foreground border-border/60">
+      {/* 顶部控制栏与视图切换（移动端响应式分行与防文字折行） */}
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between border-b border-border/50 pb-2.5">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <Wifi className="size-4 text-primary shrink-0" />
+          <span className="font-semibold text-foreground text-xs whitespace-nowrap">网络延迟拓扑测控</span>
+          <Badge className="h-4.5 rounded-[1px] px-1.5 text-[11px] font-mono text-muted-foreground border-border/60 shrink-0">
             {pingSeries.length} 条测试线路
           </Badge>
           {latencyDataSpan && (
-            <span className="text-xs text-muted-foreground font-medium hidden sm:inline">
+            <span className="text-xs text-muted-foreground font-medium hidden sm:inline truncate">
               · {latencyDataSpan}
             </span>
           )}
         </div>
 
         {/* 交互工具栏：削峰开关与视图模式切换器 */}
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground select-none">
+        <div className="flex items-center justify-between sm:justify-end gap-3 flex-wrap">
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground select-none shrink-0">
             <input
               type="checkbox"
               checked={smooth}
               onChange={(e) => onToggleSmooth(e.target.checked)}
               className="accent-foreground rounded-[1px]"
             />
-            <span>智能削峰</span>
+            <span className="whitespace-nowrap">智能削峰</span>
           </label>
 
-          {/* 视图模式按钮 */}
-          <div className="flex items-center gap-1 rounded-[2px] border border-border/60 bg-muted/30 p-0.5 text-xs">
+          {/* 视图模式按钮（禁止文字换行） */}
+          <div className="flex items-center gap-1 rounded-[2px] border border-border/60 bg-muted/30 p-0.5 text-xs overflow-x-auto no-scrollbar shrink-0">
             <button
               type="button"
               onClick={() => setViewMode("combined")}
               className={cn(
-                "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors",
+                "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors whitespace-nowrap shrink-0",
                 viewMode === "combined"
                   ? "bg-primary text-primary-foreground font-medium shadow-2xs"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <TrendingUp className="size-3" />
-              <span>聚合对比</span>
+              <TrendingUp className="size-3 shrink-0" />
+              <span className="whitespace-nowrap">聚合对比</span>
             </button>
 
             <button
               type="button"
               onClick={() => setViewMode("split")}
               className={cn(
-                "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors",
+                "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors whitespace-nowrap shrink-0",
                 viewMode === "split"
                   ? "bg-primary text-primary-foreground font-medium shadow-2xs"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Grid className="size-3" />
-              <span>分轨矩阵</span>
+              <Grid className="size-3 shrink-0" />
+              <span className="whitespace-nowrap">分轨矩阵</span>
             </button>
 
             <button
               type="button"
               onClick={() => setViewMode("ranking")}
               className={cn(
-                "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors",
+                "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors whitespace-nowrap shrink-0",
                 viewMode === "ranking"
                   ? "bg-primary text-primary-foreground font-medium shadow-2xs"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <BarChart2 className="size-3" />
-              <span>延迟排行</span>
+              <BarChart2 className="size-3 shrink-0" />
+              <span className="whitespace-nowrap">延迟排行</span>
             </button>
           </div>
         </div>

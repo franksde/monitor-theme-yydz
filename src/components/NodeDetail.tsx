@@ -127,18 +127,18 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
       {/* 1. 顶部工控硬件与系统规格总览 */}
       <NodeSpecs node={node} />
 
-      {/* 2. 详情监控主视图控制栏（资源/延迟切换与时间范围选择） */}
+      {/* 2. 详情监控主视图控制栏（资源/延迟切换与时间范围选择，移动端响应式防换行） */}
       <div className="space-y-2.5 border-t border-border/70 pt-3.5">
-        <div className="flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           {/* 标签页选择器 */}
-          <div className="flex items-center gap-1 rounded-[2px] border border-border/70 bg-muted/40 p-0.5">
+          <div className="flex items-center gap-1 rounded-[2px] border border-border/70 bg-muted/40 p-0.5 shrink-0 self-start">
             {TABS.map((t) => (
               <button
                 key={t.key}
                 type="button"
                 aria-pressed={tab === t.key}
                 onClick={() => setTab(t.key)}
-                className={`rounded-[1px] px-3 py-1 text-xs font-medium transition-all duration-150 ${
+                className={`rounded-[1px] px-3 py-1 text-xs font-medium transition-all duration-150 whitespace-nowrap shrink-0 ${
                   tab === t.key
                     ? "bg-primary text-primary-foreground shadow-2xs font-semibold"
                     : "text-muted-foreground hover:text-foreground"
@@ -149,8 +149,8 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
             ))}
           </div>
 
-          {/* 时间跨度窗口选择器 */}
-          <div className="flex flex-wrap items-center gap-1">
+          {/* 时间跨度窗口选择器（支持平滑滚动，禁止折行） */}
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full shrink-0">
             {ranges.map((r) => (
               <Tab
                 key={r.hours}

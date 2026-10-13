@@ -89,50 +89,48 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
         </div>
 
         {/* 右侧：实时关键遥测指标胶囊（运行时长、负载、实时网络速率） */}
-        {/* 适配手机端（自适应流式排版、无水平溢出）与桌面端（恒定槽位宽度防抖） */}
-        <div className="flex w-full min-w-0 flex-col gap-2 text-xs sm:flex-row sm:flex-wrap sm:items-center lg:w-auto">
-          {/* 运行与负载胶囊区域 */}
-          <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
-            {/* 1. 运行时间胶囊 */}
-            <div
-              className="flex h-7 min-w-0 flex-1 items-center justify-between gap-1.5 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border sm:flex-initial sm:min-w-[136px]"
-              title="系统连续运行时间"
-            >
-              <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
-                <Clock className="size-3 text-muted-foreground/80 shrink-0" />
-                <span>运行</span>
-              </div>
-              <span className="tnum font-mono text-xs font-medium text-foreground text-right shrink-0 whitespace-nowrap">
-                {m && m.uptime > 0 ? uptime(m.uptime) : "—"}
-              </span>
+        {/* 右侧：实时关键遥测指标胶囊（移动端单列全宽自适应，桌面端水平排列防抖） */}
+        <div className="grid w-full grid-cols-1 gap-2 text-xs sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+          {/* 1. 运行时间胶囊 */}
+          <div
+            className="flex h-7 w-full items-center justify-between gap-1.5 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border sm:w-auto sm:min-w-[136px]"
+            title="系统连续运行时间"
+          >
+            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
+              <Clock className="size-3 text-muted-foreground/80 shrink-0" />
+              <span>运行</span>
             </div>
+            <span className="tnum font-mono text-xs font-medium text-foreground text-right shrink-0 whitespace-nowrap">
+              {m && m.uptime > 0 ? uptime(m.uptime) : "—"}
+            </span>
+          </div>
 
-            {/* 2. 系统负载胶囊 */}
-            <div
-              className="flex h-7 min-w-0 flex-[1.4] items-center justify-between gap-1.5 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border sm:flex-initial sm:min-w-[185px]"
-              title="系统 1 / 5 / 15 分钟平均负载"
-            >
-              <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
-                <Activity className="size-3 text-muted-foreground/80 shrink-0" />
-                <span>负载</span>
-              </div>
-              <span className="tnum font-mono text-xs font-medium text-foreground text-right shrink-0 whitespace-nowrap">
-                {m?.load ? m.load.map((l) => l.toFixed(2)).join(" / ") : "— / — / —"}
-              </span>
+          {/* 2. 系统负载胶囊 */}
+          <div
+            className="flex h-7 w-full items-center justify-between gap-1.5 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border sm:w-auto sm:min-w-[185px]"
+            title="系统 1 / 5 / 15 分钟平均负载"
+          >
+            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
+              <Activity className="size-3 text-muted-foreground/80 shrink-0" />
+              <span>负载</span>
             </div>
+            <span className="tnum font-mono text-xs font-medium text-foreground text-right shrink-0 whitespace-nowrap">
+              {m?.load ? m.load.map((l) => l.toFixed(2)).join(" / ") : "— / — / —"}
+            </span>
           </div>
 
           {/* 3. 实时网络吞吐胶囊 */}
           <div
-            className="flex h-7 w-full min-w-0 items-center justify-between gap-2 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border sm:w-auto sm:justify-start"
+            className="flex h-7 w-full items-center justify-between gap-2 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border sm:w-auto sm:justify-start"
             title="实时网络吞吐速率 (下行 / 上行)"
           >
-            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground sm:hidden">
+            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
+              <ArrowDown className="size-3 text-muted-foreground/80 shrink-0 hidden sm:inline" />
               <span>网速</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1 shrink-0">
-                <ArrowDown className="size-3 text-muted-foreground/80 shrink-0" />
+                <ArrowDown className="size-3 text-muted-foreground/80 shrink-0 sm:hidden" />
                 <span className="tnum font-mono text-xs font-medium text-foreground text-right shrink-0 whitespace-nowrap sm:w-[68px]">
                   {m ? rate(m.net_rx) : "0 B/s"}
                 </span>

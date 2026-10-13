@@ -410,72 +410,72 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
 
   return (
     <div className="space-y-4">
-      {/* 视图模式切换胶囊 */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2.5">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Activity className="size-3.5 text-primary" />
-          <span className="font-semibold text-foreground">主机资源分析测控</span>
-          <span className="text-xs text-muted-foreground font-medium">
+      {/* 视图模式切换胶囊（移动端垂直分行避免挤压，按钮禁止折行并支持微滚动） */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border/50 pb-2.5">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+          <Activity className="size-3.5 text-primary shrink-0" />
+          <span className="font-semibold text-foreground whitespace-nowrap">主机资源分析测控</span>
+          <span className="text-xs text-muted-foreground font-medium truncate">
             · {dataSpanInfo.text}
           </span>
         </div>
 
-        {/* 模式选择按钮组 */}
-        <div className="flex items-center gap-1 rounded-[2px] border border-border/60 bg-muted/30 p-0.5 text-xs">
+        {/* 模式选择按钮组（禁止内部文字换行） */}
+        <div className="flex items-center gap-1 rounded-[2px] border border-border/60 bg-muted/30 p-0.5 text-xs overflow-x-auto no-scrollbar max-w-full shrink-0">
           <button
             type="button"
             onClick={() => setViewMode("overview")}
             className={cn(
-              "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors",
+              "flex items-center justify-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors whitespace-nowrap shrink-0",
               viewMode === "overview"
                 ? "bg-primary text-primary-foreground font-medium shadow-2xs"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <Activity className="size-3" />
-            <span>全景仪表</span>
+            <Activity className="size-3 shrink-0" />
+            <span className="whitespace-nowrap">全景仪表</span>
           </button>
 
           <button
             type="button"
             onClick={() => setViewMode("trends")}
             className={cn(
-              "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors",
+              "flex items-center justify-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors whitespace-nowrap shrink-0",
               viewMode === "trends"
                 ? "bg-primary text-primary-foreground font-medium shadow-2xs"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <TrendingUp className="size-3" />
-            <span>时序曲线</span>
+            <TrendingUp className="size-3 shrink-0" />
+            <span className="whitespace-nowrap">时序曲线</span>
           </button>
 
           <button
             type="button"
             onClick={() => setViewMode("heatmap")}
             className={cn(
-              "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors",
+              "flex items-center justify-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors whitespace-nowrap shrink-0",
               viewMode === "heatmap"
                 ? "bg-primary text-primary-foreground font-medium shadow-2xs"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <Flame className="size-3" />
-            <span>负载热力</span>
+            <Flame className="size-3 shrink-0" />
+            <span className="whitespace-nowrap">负载热力</span>
           </button>
 
           <button
             type="button"
             onClick={() => setViewMode("donut")}
             className={cn(
-              "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors",
+              "flex items-center justify-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors whitespace-nowrap shrink-0",
               viewMode === "donut"
                 ? "bg-primary text-primary-foreground font-medium shadow-2xs"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <PieIcon className="size-3" />
-            <span>占比饼图</span>
+            <PieIcon className="size-3 shrink-0" />
+            <span className="whitespace-nowrap">占比饼图</span>
           </button>
         </div>
       </div>
