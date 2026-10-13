@@ -194,3 +194,210 @@ export function calculateNodeTypes(nodes: Node[]): NodeTypesSummary {
 
   return { virtList, archList }
 }
+
+export type SortMode =
+  | "default"
+  | "cpu_desc"
+  | "mem_desc"
+  | "net_desc"
+  | "expires_asc"
+  | "traffic_desc"
+
+export type FilterStatus = "all" | "online" | "offline"
+
+/**
+ * 多维节点过滤与动态排序算法
+ */
+export function filterAndSortNodes(
+  nodes: Node[],
+  search: string,
+  status: FilterStatus,
+  sort: SortMode,
+  offlinePlacement = "default",
+): Node[] {
+  // 1. 在线状态过滤
+  let result = nodes
+  if (status === "online") {
+    result = result.filter((n) => n.online)
+  } else if (status === "offline") {
+    result = result.filter((n) => !n.online)
+  }
+
+  // 2. 关键字全文检索
+  const q = search.trim().toLowerCase()
+  if (q) {
+    result = result.filter((n) => {
+      const matchName = n.name.toLowerCase().includes(q)
+      const matchGroup = n.group ? n.group.toLowerCase().includes(q) : false
+      const matchCountry = n.country ? n.country.toLowerCase().includes(q) : false
+      const matchArch = n.arch ? n.arch.toLowerCase().includes(q) : false
+      const matchVirt = n.virt ? n.virt.toLowerCase().includes(q) : false
+      const matchCpu = n.cpu_name ? n.cpu_name.toLowerCase().includes(q) : false
+      const matchRemark = n.remark ? n.remark.toLowerCase().includes(q) : false
+      const matchPublicRemark = (n as Node & { public_remark?: string }).public_remark
+        ? (n as Node & { public_remark?: string }).public_remark!.toLowerCase().includes(q)
+        : false
+      const matchIp = n.ip ? n.ip.toLowerCase().includes(q) : false
+      const matchOs = n.os ? n.os.toLowerCase().includes(q) : false
+
+      return (
+        matchName ||
+        matchGroup ||
+        matchCountry ||
+        matchArch ||
+        matchVirt ||
+        matchCpu ||
+        matchRemark ||
+        matchPublicRemark ||
+        matchIp ||
+        matchOs
+      )
+    })
+  }
+
+  // 3. 指标多维排序
+  if (sort === "default") {
+    if (offlinePlacement === "bottom") {
+      result = [...result.filter((n) => n.online), ...result.filter((n) => !n.online)]
+    }
+  } else {
+    result = [...result].sort((a, b) => {
+      // 离线节点始终沉底
+      if (a.online !== b.online) {
+        return a.online ? -1 : 1
+      }
+      switch (sort) {
+        case "cpu_desc":
+          return (b.metrics?.cpu ?? -1) - (a.metrics?.cpu ?? -1)
+        case "mem_desc": {
+          const aMem = a.metrics && a.mem_total > 0 ? a.metrics.mem_used / a.mem_total : -1
+          const bMem = b.metrics && b.mem_total > 0 ? b.metrics.mem_used / b.mem_total : -1
+          return bMem - aMem
+        }
+        case "net_desc": {
+          const aNet = (a.metrics?.net_rx ?? 0) + (a.metrics?.net_tx ?? 0)
+          const bNet = (b.metrics?.net_rx ?? 0) + (b.metrics?.net_tx ?? 0)
+          return bNet - aNet
+        }
+        case "expires_asc": {
+          const aDays = a.expires_in !== undefined ? a.expires_in : daysUntil(a.expires_at)
+          const bDays = b.expires_in !== undefined ? b.expires_in : daysUntil(b.expires_at)
+          if (aDays === null && bDays === null) return 0
+          if (aDays === null) return 1
+          if (bDays === null) return -1
+          return aDays - bDays
+        }
+        case "traffic_desc": {
+          const aTraffic = a.month_rx + a.month_tx
+          const bTraffic = b.month_rx + b.month_tx
+          return bTraffic - aTraffic
+        }
+        default:
+          return 0
+      }
+    })
+  }
+
+  return result
+}
+
+export type UptimeSlaSegment = {
+  ts: number
+  startTs: number
+  endTs: number
+  minutes: number
+  expected: number
+  status: "up" | "degraded" | "down"
+  pct: number
+}
+
+export type UptimeSlaSummary = {
+  slaPct: number
+  totalMinutes: number
+  expectedMinutes: number
+  segments: UptimeSlaSegment[]
+}
+
+/**
+ * 计算历史窗口期内的真实在线率 SLA 与分段心跳健康度
+ * 解决节点离线时后端不返回采样点（时间序列存在断档/Gap）导致虚假 100% SLA 的核心缺陷。
+ */
+export function calculateUptimeSla(
+  metrics: Array<{ ts: number; minutes?: number }>,
+  step = 60,
+  hours = 24,
+  segmentCount = 48,
+): UptimeSlaSummary {
+  if (!metrics || metrics.length === 0 || !hours || hours <= 0) {
+    return { slaPct: 100, totalMinutes: 0, expectedMinutes: 0, segments: [] }
+  }
+
+  const latestTs = metrics[metrics.length - 1].ts
+  const firstTs = metrics[0].ts
+  const requestedSpan = hours * 3600
+  const actualSpan = Math.max(0, latestTs - firstTs)
+
+  // 若历史采样跨度达到请求窗口的 75% 以上，使用标准请求窗口，否则按实际跨度
+  const effectiveSpan = actualSpan >= requestedSpan * 0.75 ? requestedSpan : Math.max(actualSpan, step)
+  const windowEnd = latestTs
+  const windowStart = windowEnd - effectiveSpan
+  const expectedTotalMinutes = Math.max(1, Math.round(effectiveSpan / 60))
+
+  // 统计窗口内真实在线分钟数（累加落在窗口内的采样点）
+  let totalOnlineMinutes = 0
+  for (const p of metrics) {
+    if (p.ts >= windowStart - step * 0.5 && p.ts <= windowEnd + step * 0.5) {
+      const m = typeof p.minutes === "number" ? p.minutes : Math.max(1, Math.round(step / 60))
+      totalOnlineMinutes += m
+    }
+  }
+
+  // 防止统计微量超出期望值
+  totalOnlineMinutes = Math.min(expectedTotalMinutes, totalOnlineMinutes)
+  const slaPct = (totalOnlineMinutes / expectedTotalMinutes) * 100
+
+  const segDuration = effectiveSpan / segmentCount
+  const expectedPerSeg = segDuration / 60
+
+  const segments: UptimeSlaSegment[] = []
+  for (let i = 0; i < segmentCount; i++) {
+    const sStart = windowStart + i * segDuration
+    const sEnd = sStart + segDuration
+
+    // 查找落在此时间段内的采样点
+    const pts = metrics.filter((p) => p.ts >= sStart - step * 0.1 && p.ts < sEnd - step * 0.1)
+    const segOnline = pts.reduce((sum, p) => {
+      const m = typeof p.minutes === "number" ? p.minutes : Math.max(1, Math.round(step / 60))
+      return sum + m
+    }, 0)
+
+    const effectiveOnline = Math.min(expectedPerSeg, segOnline)
+    const pct = expectedPerSeg > 0 ? (effectiveOnline / expectedPerSeg) * 100 : 0
+
+    let status: "up" | "degraded" | "down" = "up"
+    if (effectiveOnline <= 0.05) {
+      status = "down"
+    } else if (effectiveOnline < expectedPerSeg * 0.85) {
+      status = "degraded"
+    } else {
+      status = "up"
+    }
+
+    segments.push({
+      ts: Math.round(sStart),
+      startTs: Math.round(sStart),
+      endTs: Math.round(sEnd),
+      minutes: Number(effectiveOnline.toFixed(1)),
+      expected: Number(expectedPerSeg.toFixed(1)),
+      status,
+      pct: Number(pct.toFixed(1)),
+    })
+  }
+
+  return {
+    slaPct: Math.min(100, Math.max(0, Number(slaPct.toFixed(2)))),
+    totalMinutes: totalOnlineMinutes,
+    expectedMinutes: expectedTotalMinutes,
+    segments,
+  }
+}

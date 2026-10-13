@@ -70,6 +70,7 @@ export type Node = {
   hostname?: string
   ip?: string
   remark?: string
+  public_remark?: string
 }
 
 /** Every group in use, in the order of the first node carrying it: the operator's node order decides the tab order. */

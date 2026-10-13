@@ -15,6 +15,7 @@ import { windows } from "@/lib/format"
 import { NodeSpecs } from "@/components/NodeSpecs"
 import { ResourceCharts, type MetricPoint } from "@/components/ResourceCharts"
 import { LatencyDashboard, type PingSample, type ProbeSeries } from "@/components/LatencyDashboard"
+import { UptimeSlaBar, UptimeSlaBarSkeleton } from "@/components/UptimeSlaBar"
 
 /** 探测点名称映射字典 */
 type Probes = Record<string, string>
@@ -74,6 +75,7 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
     ping: PingSample[]
     probes: Probes
     loss?: Loss
+    step?: number
   } | null>(null)
   const [failed, setFailed] = useState("")
   const [attempt, setAttempt] = useState(0)
@@ -88,7 +90,7 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
     const points = Math.round(globalThis.innerWidth * (globalThis.devicePixelRatio || 1))
     const series = tab === "latency" ? "ping" : "metrics"
 
-    api<{ metrics: MetricPoint[]; ping: PingSample[]; probes: Probes; loss?: Loss }>(
+    api<{ metrics: MetricPoint[]; ping: PingSample[]; probes: Probes; loss?: Loss; step?: number }>(
       `/nodes/${node.id}/metrics?hours=${hours}&points=${points}&series=${series}`,
     )
       .then((next) => {
@@ -164,6 +166,13 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
           </div>
         </div>
       </div>
+
+      {/* 2.5 历史服务可用性 SLA 与时间轴心跳健康条 */}
+      {!data ? (
+        <UptimeSlaBarSkeleton hours={hours} />
+      ) : data.metrics && data.metrics.length > 0 ? (
+        <UptimeSlaBar metrics={data.metrics} step={data.step} hours={hours} />
+      ) : null}
 
       {/* 3. 遥测核心展示区 */}
       {!data ? (

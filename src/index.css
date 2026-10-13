@@ -148,7 +148,6 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     scrollbar-gutter: stable;
-    scroll-behavior: smooth;
   }
   body {
     @apply bg-background text-foreground antialiased;

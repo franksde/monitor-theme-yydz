@@ -3,6 +3,8 @@ import {
   calculateCosts,
   calculateExpiryRank,
   calculateNodeTypes,
+  calculateUptimeSla,
+  filterAndSortNodes,
   formatArch,
   formatVirt,
   getCycleMonths,
@@ -145,9 +147,53 @@ eq(nodeTypes.virtList[2], { name: "物理机", count: 1 }, "物理机排第三 (
 eq(nodeTypes.archList[0], { name: "arm64", count: 3 }, "arm64 3台排第一")
 eq(nodeTypes.archList[1], { name: "x86_64", count: 3 }, "x86_64 3台排第二")
 
+// 5. 过滤与排序测试
+const sampleNodes = [
+  mockNode({ id: 1, name: "tokyo-kvm", online: true, metrics: { ...mockNode().metrics!, cpu: 20 } as any }),
+  mockNode({ id: 2, name: "osaka-lxc", online: true, metrics: { ...mockNode().metrics!, cpu: 85 } as any }),
+  mockNode({ id: 3, name: "us-offline", online: false, metrics: null }),
+]
+
+eq(filterAndSortNodes(sampleNodes, "", "online", "default").length, 2, "仅看在线过滤出 2 台")
+eq(filterAndSortNodes(sampleNodes, "", "offline", "default").length, 1, "仅看离线过滤出 1 台")
+eq(filterAndSortNodes(sampleNodes, "tokyo", "all", "default").length, 1, "搜索 tokyo 过滤出 1 台")
+eq(filterAndSortNodes(sampleNodes, "none", "all", "default").length, 0, "不存在关键字返回 0 台")
+
+const sortedByCpu = filterAndSortNodes(sampleNodes, "", "all", "cpu_desc")
+eq(sortedByCpu[0].name, "osaka-lxc", "CPU 占用最高 85% 排最前")
+eq(sortedByCpu[1].name, "tokyo-kvm", "CPU 占用 20% 排第二")
+eq(sortedByCpu[2].name, "us-offline", "离线节点沉底排最后")
+
+// 6. 在线率 SLA 测试
+const emptySla = calculateUptimeSla([], 60, 6)
+eq(emptySla.slaPct, 100, "空明细默认 100% SLA")
+
+// 连续在线测试 (6小时，360个点全勤)
+const fullMetrics = Array.from({ length: 360 }, (_, i) => ({
+  ts: 1000000 + i * 60,
+  minutes: 1,
+}))
+const perfectSla = calculateUptimeSla(fullMetrics, 60, 6, 48)
+eq(perfectSla.slaPct, 100, "满额在线 100% SLA")
+eq(perfectSla.segments.length, 48, "生成 48 个分段")
+eq(perfectSla.segments.every((s) => s.status === "up"), true, "全部为健康 up")
+
+// 离线断档测试 (6小时离线1小时，300分钟在线，60分钟空洞)
+const gapMetrics: Array<{ ts: number; minutes: number }> = []
+for (let i = 0; i < 360; i++) {
+  if (i >= 60 && i < 120) continue // 模拟掉线 1 小时
+  gapMetrics.push({ ts: 1000000 + i * 60, minutes: 1 })
+}
+const gapSla = calculateUptimeSla(gapMetrics, 60, 6, 48)
+eq(gapSla.slaPct, 83.33, "6小时离线1小时计算出 83.33% SLA")
+eq(gapSla.totalMinutes, 300, "实际在线分钟数 300")
+eq(gapSla.expectedMinutes, 360, "期望总分钟数 360")
+eq(gapSla.segments.some((s) => s.status === "down"), true, "离线断档时间段存在 down 标记")
+
 if (failed) {
   console.error(`\nsummary 校验失败：${failed} 项不通过`)
   process.exit(1)
 } else {
   console.log("summary 模块单元测试全部通过")
 }
+

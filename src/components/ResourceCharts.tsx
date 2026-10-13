@@ -31,6 +31,7 @@ import {
   Flame,
   HardDrive,
   Layers,
+  Network,
   PieChart as PieIcon,
   TrendingUp,
 } from "lucide-react"
@@ -59,6 +60,10 @@ export type MetricPoint = {
   net_tx: number
   net_rx_max?: number
   net_tx_max?: number
+  tcp?: number
+  udp?: number
+  procs?: number
+  minutes?: number
 }
 
 export type ResourceChartsProps = {
@@ -68,7 +73,7 @@ export type ResourceChartsProps = {
 }
 
 // 视图模式定义
-type ViewMode = "overview" | "trends" | "heatmap" | "donut"
+type ViewMode = "overview" | "trends" | "heatmap" | "donut" | "connections"
 
 const AXIS = { stroke: "currentColor", fontSize: 12, tickLine: false, axisLine: false }
 const VALUE_AXIS = { ...AXIS, width: 68, interval: 0 }
@@ -229,6 +234,36 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
       maxRx,
       avgTx: totalTx / metricRows.length,
       maxTx,
+    }
+  }, [metricRows, m])
+
+  // 并发连接与系统进程统计聚合（TCP 活跃连接、UDP 监听、系统总进程数）
+  const connStats = useMemo(() => {
+    const curTcp = m?.tcp ?? metricRows[metricRows.length - 1]?.tcp ?? 0
+    const curUdp = m?.udp ?? metricRows[metricRows.length - 1]?.udp ?? 0
+    const curProcs = m?.procs ?? metricRows[metricRows.length - 1]?.procs ?? 0
+
+    const tcpVals = metricRows.map((r) => r.tcp ?? 0).filter((v) => v > 0)
+    const udpVals = metricRows.map((r) => r.udp ?? 0).filter((v) => v > 0)
+    const procsVals = metricRows.map((r) => r.procs ?? 0).filter((v) => v > 0)
+
+    const avgTcp = tcpVals.length ? Math.round(tcpVals.reduce((a, b) => a + b, 0) / tcpVals.length) : curTcp
+    const maxTcp = tcpVals.length ? Math.max(...tcpVals) : curTcp
+    const avgUdp = udpVals.length ? Math.round(udpVals.reduce((a, b) => a + b, 0) / udpVals.length) : curUdp
+    const maxUdp = udpVals.length ? Math.max(...udpVals) : curUdp
+    const avgProcs = procsVals.length ? Math.round(procsVals.reduce((a, b) => a + b, 0) / procsVals.length) : curProcs
+    const maxProcs = procsVals.length ? Math.max(...procsVals) : curProcs
+
+    return {
+      curTcp,
+      avgTcp,
+      maxTcp,
+      curUdp,
+      avgUdp,
+      maxUdp,
+      curProcs,
+      avgProcs,
+      maxProcs,
     }
   }, [metricRows, m])
 
@@ -477,121 +512,135 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
             <PieIcon className="size-3 shrink-0" />
             <span className="whitespace-nowrap">占比饼图</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode("connections")}
+            className={cn(
+              "flex items-center justify-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors whitespace-nowrap shrink-0",
+              viewMode === "connections"
+                ? "bg-primary text-primary-foreground font-medium shadow-2xs"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Network className="size-3 shrink-0" />
+            <span className="whitespace-nowrap">连接进程</span>
+          </button>
         </div>
       </div>
 
-      {/* 1. USE 比例图：CPU、内存、硬盘、流量比例工控仪表矩阵 */}
-      {(viewMode === "overview" || viewMode === "donut") && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {/* CPU 综合使用率 */}
-          <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
-            <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-1.5 font-medium text-foreground">
-                <Cpu className="size-3.5 text-primary" />
-                <span>CPU 核心负荷</span>
-              </span>
-              <span className="font-mono text-xs font-semibold text-foreground">
-                {currentCpuPct.toFixed(1)}%
-              </span>
-            </div>
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
-              <div
-                className={cn(
-                  "h-full transition-all duration-300",
-                  currentCpuPct > 80
-                    ? "bg-destructive"
-                    : currentCpuPct > 60
-                      ? "bg-warn"
-                      : "bg-primary"
-                )}
-                style={{ width: `${Math.min(100, Math.max(0, currentCpuPct))}%` }}
-              />
-            </div>
-            <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
-              <span>窗口均值 {stats.avgCpu.toFixed(1)}%</span>
-              <span>窗口峰值 {stats.maxCpu.toFixed(1)}%</span>
-            </div>
+      {/* 1. USE 比例图：CPU、内存、硬盘、流量比例工控仪表矩阵（在所有视图下作为恒定系统 HUD 呈现，稳定视口） */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {/* CPU 综合使用率 */}
+        <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
+          <div className="flex items-center justify-between text-xs">
+            <span className="flex items-center gap-1.5 font-medium text-foreground">
+              <Cpu className="size-3.5 text-primary" />
+              <span>CPU 核心负荷</span>
+            </span>
+            <span className="font-mono text-xs font-semibold text-foreground">
+              {currentCpuPct.toFixed(1)}%
+            </span>
           </div>
-
-          {/* 内存空间使用率 */}
-          <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
-            <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-1.5 font-medium text-foreground">
-                <Layers className="size-3.5 text-primary" />
-                <span>物理内存占用</span>
-              </span>
-              <span className="font-mono text-xs font-semibold text-foreground">
-                {currentMemPct.toFixed(1)}%
-              </span>
-            </div>
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
-              <div
-                className="h-full bg-foreground transition-all duration-300"
-                style={{ width: `${Math.min(100, Math.max(0, currentMemPct))}%` }}
-              />
-            </div>
-            <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
-              <span>实时 {bytes(m ? m.mem_used : stats.avgMem)}</span>
-              <span>均值 {bytes(stats.avgMem)}</span>
-            </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+            <div
+              className={cn(
+                "h-full transition-all duration-300",
+                currentCpuPct > 80
+                  ? "bg-destructive"
+                  : currentCpuPct > 60
+                    ? "bg-warn"
+                    : "bg-primary"
+              )}
+              style={{ width: `${Math.min(100, Math.max(0, currentCpuPct))}%` }}
+            />
           </div>
-
-          {/* 存储空间占用率 */}
-          <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
-            <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-1.5 font-medium text-foreground">
-                <HardDrive className="size-3.5 text-primary" />
-                <span>系统存储占用</span>
-              </span>
-              <span className="font-mono text-xs font-semibold text-foreground">
-                {currentDiskPct.toFixed(1)}%
-              </span>
-            </div>
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
-              <div
-                className={cn(
-                  "h-full transition-all duration-300",
-                  currentDiskPct > 90 ? "bg-destructive" : "bg-foreground"
-                )}
-                style={{ width: `${Math.min(100, Math.max(0, currentDiskPct))}%` }}
-              />
-            </div>
-            <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
-              <span>已用 {bytes(m ? m.disk_used : 0)}</span>
-              <span>总量 {bytes(node.disk_total)}</span>
-            </div>
-          </div>
-
-          {/* 网络出入吞吐 / 流量配额消耗 */}
-          <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
-            <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-1.5 font-medium text-foreground">
-                <Activity className="size-3.5 text-primary" />
-                <span>网络带宽吞吐</span>
-              </span>
-              <span className="font-mono text-xs font-semibold text-foreground">
-                {currentTrafficPct !== null ? `月配额 ${currentTrafficPct.toFixed(1)}%` : `峰值 ${rate(Math.max(stats.maxRx, stats.maxTx))}`}
-              </span>
-            </div>
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
-              <div
-                className="h-full bg-ok transition-all duration-300"
-                style={{
-                  width: `${currentTrafficPct !== null ? Math.min(100, currentTrafficPct) : 100}%`,
-                }}
-              />
-            </div>
-            <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
-              <span>均值 ↓ {rate(stats.avgRx)}</span>
-              <span>均值 ↑ {rate(stats.avgTx)}</span>
-            </div>
+          <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
+            <span>窗口均值 {stats.avgCpu.toFixed(1)}%</span>
+            <span>窗口峰值 {stats.maxCpu.toFixed(1)}%</span>
           </div>
         </div>
-      )}
 
-      {/* 2. 环形饼图分布模块：内存分布、磁盘分布、网络流量占比 */}
-      {(viewMode === "overview" || viewMode === "donut") && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {/* 物理内存占用 */}
+        <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
+          <div className="flex items-center justify-between text-xs">
+            <span className="flex items-center gap-1.5 font-medium text-foreground">
+              <Layers className="size-3.5 text-primary" />
+              <span>物理内存占用</span>
+            </span>
+            <span className="font-mono text-xs font-semibold text-foreground">
+              {currentMemPct.toFixed(1)}%
+            </span>
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+            <div
+              className="h-full bg-foreground transition-all duration-300"
+              style={{ width: `${Math.min(100, Math.max(0, currentMemPct))}%` }}
+            />
+          </div>
+          <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
+            <span>实时 {bytes(m ? m.mem_used : stats.avgMem)}</span>
+            <span>均值 {bytes(stats.avgMem)}</span>
+          </div>
+        </div>
+
+        {/* 存储空间占用率 */}
+        <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
+          <div className="flex items-center justify-between text-xs">
+            <span className="flex items-center gap-1.5 font-medium text-foreground">
+              <HardDrive className="size-3.5 text-primary" />
+              <span>系统存储占用</span>
+            </span>
+            <span className="font-mono text-xs font-semibold text-foreground">
+              {currentDiskPct.toFixed(1)}%
+            </span>
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+            <div
+              className={cn(
+                "h-full transition-all duration-300",
+                currentDiskPct > 90 ? "bg-destructive" : "bg-foreground"
+              )}
+              style={{ width: `${Math.min(100, Math.max(0, currentDiskPct))}%` }}
+            />
+          </div>
+          <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
+            <span>已用 {bytes(m ? m.disk_used : 0)}</span>
+            <span>总量 {bytes(node.disk_total)}</span>
+          </div>
+        </div>
+
+        {/* 网络出入吞吐 / 流量配额消耗 */}
+        <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
+          <div className="flex items-center justify-between text-xs">
+            <span className="flex items-center gap-1.5 font-medium text-foreground">
+              <Activity className="size-3.5 text-primary" />
+              <span>网络带宽吞吐</span>
+            </span>
+            <span className="font-mono text-xs font-semibold text-foreground">
+              {currentTrafficPct !== null ? `月配额 ${currentTrafficPct.toFixed(1)}%` : `峰值 ${rate(Math.max(stats.maxRx, stats.maxTx))}`}
+            </span>
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+            <div
+              className="h-full bg-ok transition-all duration-300"
+              style={{
+                width: `${currentTrafficPct !== null ? Math.min(100, currentTrafficPct) : 100}%`,
+              }}
+            />
+          </div>
+          <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
+            <span>均值 ↓ {rate(stats.avgRx)}</span>
+            <span>均值 ↑ {rate(stats.avgTx)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. 深度测控视图主区域（具有平稳的最小高度，杜绝切换视图时高度骤缩导致的滚动跳顶与抖动） */}
+      <div className="min-h-[460px] space-y-4">
+        {/* 环形饼图分布模块：内存分布、磁盘分布、网络流量占比 */}
+        {(viewMode === "overview" || viewMode === "donut") && (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {/* 内存环形饼图 */}
           <div className="relative overflow-visible flex flex-col rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs hover:z-30 transition-all">
             <div className="border-b border-border/40 pb-1.5 text-xs font-medium text-foreground">
@@ -1000,6 +1049,155 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
           </div>
         </div>
       )}
+
+      {/* 5. 网络套接字与系统进程时序追踪 (viewMode === "connections") */}
+      {viewMode === "connections" && (
+        <div className="space-y-4 pt-1">
+          {/* 指标卡片网格：TCP、UDP、进程 */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            {/* TCP 活跃连接 */}
+            <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 font-medium text-foreground">
+                  <Network className="size-3.5 text-primary" />
+                  <span>TCP 活跃连接数</span>
+                </span>
+                <span className="font-mono text-xs font-bold text-foreground">
+                  {connStats.curTcp}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground border-t border-border/30 pt-2">
+                <span>均值 {connStats.avgTcp}</span>
+                <span>峰值 {connStats.maxTcp}</span>
+              </div>
+            </div>
+
+            {/* UDP 监听套接字 */}
+            <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 font-medium text-foreground">
+                  <Activity className="size-3.5 text-chart-2" />
+                  <span>UDP 监听套接字</span>
+                </span>
+                <span className="font-mono text-xs font-bold text-foreground">
+                  {connStats.curUdp}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground border-t border-border/30 pt-2">
+                <span>均值 {connStats.avgUdp}</span>
+                <span>峰值 {connStats.maxUdp}</span>
+              </div>
+            </div>
+
+            {/* 系统进程总数 */}
+            <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 font-medium text-foreground">
+                  <Layers className="size-3.5 text-chart-1" />
+                  <span>系统活跃进程 (Procs)</span>
+                </span>
+                <span className="font-mono text-xs font-bold text-foreground">
+                  {connStats.curProcs}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground border-t border-border/30 pt-2">
+                <span>均值 {connStats.avgProcs}</span>
+                <span>峰值 {connStats.maxProcs}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* TCP & UDP 并发连接走势图 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
+              <span className="flex items-center gap-1.5">
+                <Network className="size-3.5 text-primary" />
+                <span>TCP / UDP 网络套接字时序走势</span>
+              </span>
+              <span className="font-mono text-xs font-normal text-muted-foreground">
+                当前: TCP {connStats.curTcp} · UDP {connStats.curUdp}
+              </span>
+            </div>
+            <div className="mt-2 h-44 w-full text-muted-foreground">
+              <ResponsiveContainer>
+                <AreaChart data={chartRows}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+                  <XAxis {...timeAxis} />
+                  <YAxis allowDecimals={false} {...VALUE_AXIS} />
+                  <Tooltip
+                    {...TOOLTIP_STYLE}
+                    formatter={(v, name) => [
+                      `${Number(v)} 个`,
+                      name === "tcp" ? "TCP 活跃连接" : "UDP 套接字",
+                    ]}
+                  />
+                  <Area
+                    dataKey="tcp"
+                    name="tcp"
+                    stroke="var(--color-primary)"
+                    fill="var(--color-primary)"
+                    fillOpacity={0.16}
+                    {...RESOURCE_SERIES}
+                  />
+                  <Area
+                    dataKey="udp"
+                    name="udp"
+                    stroke="var(--color-chart-2)"
+                    fill="var(--color-chart-2)"
+                    fillOpacity={0.12}
+                    {...RESOURCE_SERIES}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-2 flex items-center justify-end gap-4 border-t border-border/30 pt-1.5 text-xs font-mono">
+              <div className="flex items-center gap-1.5">
+                <span className="size-2 rounded-[0.5px] bg-primary" />
+                <span className="text-muted-foreground">TCP 活跃连接</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="size-2 rounded-[0.5px]" style={{ backgroundColor: "var(--color-chart-2)" }} />
+                <span className="text-muted-foreground">UDP 监听套接字</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 系统进程走势图 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
+              <span className="flex items-center gap-1.5">
+                <Layers className="size-3.5 text-primary" />
+                <span>系统运行进程总数走势 (Process Count)</span>
+              </span>
+              <span className="font-mono text-xs font-normal text-muted-foreground">
+                当前: {connStats.curProcs} · 均值: {connStats.avgProcs} · 峰值: {connStats.maxProcs}
+              </span>
+            </div>
+            <div className="mt-2 h-44 w-full text-muted-foreground">
+              <ResponsiveContainer>
+                <AreaChart data={chartRows}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+                  <XAxis {...timeAxis} />
+                  <YAxis allowDecimals={false} {...VALUE_AXIS} />
+                  <Tooltip
+                    {...TOOLTIP_STYLE}
+                    formatter={(v) => [`${Number(v)} 个`, "系统进程数"]}
+                  />
+                  <Area
+                    dataKey="procs"
+                    name="procs"
+                    stroke="var(--color-chart-1)"
+                    fill="var(--color-chart-1)"
+                    fillOpacity={0.16}
+                    {...RESOURCE_SERIES}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
     </div>
   )
 }

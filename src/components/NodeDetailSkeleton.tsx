@@ -17,6 +17,7 @@ import {
   Grid,
   HardDrive,
   Layers,
+  Network,
   PieChart as PieIcon,
   Server,
   TrendingUp,
@@ -25,6 +26,7 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { UptimeSlaBarSkeleton } from "@/components/UptimeSlaBar"
 
 /**
  * 核心遥测指标图表局部骨架屏（针对资源监控 vs 网络延迟双视图精准适配）
@@ -162,6 +164,10 @@ export function DetailChartSkeleton({ tab = "resources" }: { tab?: "resources" |
           <div className="flex items-center justify-center gap-1 rounded-[1px] px-2 py-0.5 text-muted-foreground whitespace-nowrap shrink-0">
             <PieIcon className="size-3 shrink-0" />
             <span className="whitespace-nowrap">占比饼图</span>
+          </div>
+          <div className="flex items-center justify-center gap-1 rounded-[1px] px-2 py-0.5 text-muted-foreground whitespace-nowrap shrink-0">
+            <Network className="size-3 shrink-0" />
+            <span className="whitespace-nowrap">连接进程</span>
           </div>
         </div>
       </div>
@@ -662,6 +668,9 @@ export function NodeDetailSkeleton() {
           </div>
         </div>
       </div>
+
+      {/* 3.5 历史服务可用性 SLA 骨架条 */}
+      <UptimeSlaBarSkeleton hours={6} />
 
       {/* 4. 默认呈现对应真实的资源图表高保真骨架 */}
       <DetailChartSkeleton tab="resources" />

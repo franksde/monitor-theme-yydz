@@ -162,68 +162,89 @@ export function Summary({
 
   return (
     <div className="space-y-3">
-      {/* 行 1：实时遥测与网络流速 */}
+      {/* 行 1：集群态势与算力规模 (Cluster & Compute) */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {/* 节点总览 */}
-        <Tile icon={Server} label="节点">
+        {/* 1. 节点总览 */}
+        <Tile
+          icon={Server}
+          label="节点总览"
+          badge={
+            nodes.length > 0 ? (
+              <span className="font-mono text-[11px] text-muted-foreground">
+                {Math.round((online.length / nodes.length) * 100)}% 在线
+              </span>
+            ) : null
+          }
+        >
           <div className="tnum mt-1.5 text-xl font-bold tracking-tight">
             {online.length} <span className="text-sm font-normal text-muted-foreground">/ {nodes.length}</span>
           </div>
           <div className="mt-auto pt-1 text-xs text-muted-foreground">
             {nodes.length - online.length > 0 ? (
-              <span className="font-medium text-warn">{nodes.length - online.length} 台离线</span>
+              <span className="font-medium text-warn">{nodes.length - online.length} 台离线停机</span>
             ) : (
-              <span className="font-medium text-online">全部节点在线</span>
+              <span className="font-medium text-online">全部节点在线运行</span>
             )}
           </div>
         </Tile>
 
-        {/* 最忙节点 */}
-        <Tile icon={Activity} label="最高负载">
-          <div className="tnum mt-1.5 text-xl font-bold tracking-tight">{busiest ? `${cpu.toFixed(1)}%` : "—"}</div>
-          <div
-            className={cn(
-              "mt-auto truncate pt-1 text-xs",
-              cpu >= 85 ? "font-semibold text-destructive" : "text-muted-foreground",
-            )}
-          >
-            {busiest ? busiest.name : "暂无在线节点"}
-          </div>
+        {/* 2. 类型与架构 */}
+        <Tile
+          icon={Boxes}
+          label="类型与架构"
+          badge={
+            nodes.length > 0 ? (
+              <span className="rounded-[1px] bg-muted/60 px-1.5 py-0.5 text-[11px] font-mono text-muted-foreground">
+                共 {nodes.length} 台
+              </span>
+            ) : null
+          }
+        >
+          {nodes.length > 0 ? (
+            <div className="mt-auto space-y-1.5 pt-1 text-xs">
+              {/* 虚拟化分布 */}
+              <div className="flex items-center justify-between gap-1.5">
+                <span className="text-[11px] font-medium text-muted-foreground shrink-0">虚拟化</span>
+                <div className="flex flex-wrap items-center justify-end gap-1 overflow-hidden">
+                  {nodeTypes.virtList.map((item) => (
+                    <span
+                      key={item.name}
+                      title={`${item.name}: ${item.count} 台节点`}
+                      className="inline-flex items-center gap-1 rounded-[1px] border border-border/70 bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] font-medium text-foreground transition-colors hover:border-foreground/30"
+                    >
+                      <span>{item.name}</span>
+                      <strong className="text-primary font-semibold">{item.count}</strong>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* 架构分布 */}
+              <div className="flex items-center justify-between gap-1.5">
+                <span className="text-[11px] font-medium text-muted-foreground shrink-0">系统架构</span>
+                <div className="flex flex-wrap items-center justify-end gap-1 overflow-hidden">
+                  {nodeTypes.archList.map((item) => (
+                    <span
+                      key={item.name}
+                      title={`${item.name}: ${item.count} 台节点`}
+                      className="inline-flex items-center gap-1 rounded-[1px] border border-border/70 bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] font-medium text-foreground transition-colors hover:border-foreground/30"
+                    >
+                      <span>{item.name}</span>
+                      <strong className="text-primary font-semibold">{item.count}</strong>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-auto pt-1 text-xs text-muted-foreground">
+              暂无节点数据
+            </div>
+          )}
         </Tile>
 
-        {/* 今日流量 */}
-        <Tile icon={ArrowDownUp} label="今日流量">
-          <Flow
-            down={bytes(sum((n) => n.day_rx))}
-            up={bytes(sum((n) => n.day_tx))}
-            className="mt-1 text-xs font-semibold tracking-tight"
-          />
-          <div className="mt-1.5 text-xs font-medium text-muted-foreground">总计累计</div>
-          <Flow
-            down={bytes(sum((n) => n.total_rx))}
-            up={bytes(sum((n) => n.total_tx))}
-            className="mt-0.5 text-xs text-muted-foreground"
-          />
-        </Tile>
-
-        {/* 实时网速与微走势 */}
-        <Tile icon={Gauge} label="实时网速">
-          <Flow down={rate(now.rx)} up={rate(now.tx)} className="mt-1 text-xs font-semibold tracking-tight" />
-          <div className="mt-auto pt-1.5">
-            <Spark
-              series={[
-                { values: history.map((s) => s.rx), className: "text-foreground" },
-                { values: history.map((s) => s.tx), className: "text-muted-foreground/60" },
-              ]}
-            />
-          </div>
-        </Tile>
-      </div>
-
-      {/* 行 2：全局硬件资源与节点类型架构 */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {/* 1. CPU 核数 */}
-        <Tile icon={Cpu} label="CPU 核数">
+        {/* 3. CPU 算力规模 */}
+        <Tile icon={Cpu} label="CPU 核心">
           <div className="tnum mt-1.5 text-xl font-bold tracking-tight">
             {totalCores} <span className="text-sm font-normal text-muted-foreground">核</span>
           </div>
@@ -238,8 +259,25 @@ export function Summary({
           </div>
         </Tile>
 
-        {/* 2. 所有内存 */}
-        <Tile icon={Database} label="所有内存">
+        {/* 4. 最忙节点与最高负载 */}
+        <Tile icon={Activity} label="最高负载">
+          <div className="tnum mt-1.5 text-xl font-bold tracking-tight">{busiest ? `${cpu.toFixed(1)}%` : "—"}</div>
+          <div
+            className={cn(
+              "mt-auto truncate pt-1 text-xs",
+              cpu >= 85 ? "font-semibold text-destructive" : "text-muted-foreground",
+            )}
+            title={busiest ? `${busiest.name} (CPU: ${cpu.toFixed(1)}%)` : undefined}
+          >
+            {busiest ? busiest.name : "暂无在线节点"}
+          </div>
+        </Tile>
+      </div>
+
+      {/* 行 2：存储容量与网络吞吐 (Capacity & Throughput) */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {/* 5. 物理内存容量 */}
+        <Tile icon={Database} label="物理内存">
           <div className="tnum mt-1.5 text-xl font-bold tracking-tight">
             {bytes(totalMem)}
           </div>
@@ -261,8 +299,8 @@ export function Summary({
           </div>
         </Tile>
 
-        {/* 3. 所有硬盘 */}
-        <Tile icon={HardDrive} label="所有硬盘">
+        {/* 6. 系统存储容量 */}
+        <Tile icon={HardDrive} label="系统存储">
           <div className="tnum mt-1.5 text-xl font-bold tracking-tight">
             {bytes(totalDisk)}
           </div>
@@ -284,59 +322,32 @@ export function Summary({
           </div>
         </Tile>
 
-        {/* 4. 节点类型与架构 */}
-        <Tile
-          icon={Boxes}
-          label="类型与架构"
-          badge={
-            nodes.length > 0 ? (
-              <span className="rounded-[1px] bg-muted/60 px-1.5 py-0.5 text-[11px] font-mono text-muted-foreground">
-                共 {nodes.length} 台
-              </span>
-            ) : null
-          }
-        >
-          {nodes.length > 0 ? (
-            <div className="mt-auto space-y-1.5 pt-1 text-xs">
-              {/* 节点类型分布 (如 LXC / KVM / 物理机 等) */}
-              <div className="flex items-center justify-between gap-1.5">
-                <span className="text-[11px] font-medium text-muted-foreground shrink-0">类型</span>
-                <div className="flex flex-wrap items-center justify-end gap-1 overflow-hidden">
-                  {nodeTypes.virtList.map((item) => (
-                    <span
-                      key={item.name}
-                      title={`${item.name}: ${item.count} 台节点`}
-                      className="inline-flex items-center gap-1 rounded-[1px] border border-border/70 bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] font-medium text-foreground transition-colors hover:border-foreground/30"
-                    >
-                      <span>{item.name}</span>
-                      <strong className="text-primary font-semibold">{item.count}</strong>
-                    </span>
-                  ))}
-                </div>
-              </div>
+        {/* 7. 实时网速与微走势 */}
+        <Tile icon={Gauge} label="实时网速">
+          <Flow down={rate(now.rx)} up={rate(now.tx)} className="mt-1 text-xs font-semibold tracking-tight" />
+          <div className="mt-auto pt-1.5">
+            <Spark
+              series={[
+                { values: history.map((s) => s.rx), className: "text-foreground" },
+                { values: history.map((s) => s.tx), className: "text-muted-foreground/60" },
+              ]}
+            />
+          </div>
+        </Tile>
 
-              {/* 架构分布 (如 x86_64 / arm64 等) */}
-              <div className="flex items-center justify-between gap-1.5">
-                <span className="text-[11px] font-medium text-muted-foreground shrink-0">架构</span>
-                <div className="flex flex-wrap items-center justify-end gap-1 overflow-hidden">
-                  {nodeTypes.archList.map((item) => (
-                    <span
-                      key={item.name}
-                      title={`${item.name}: ${item.count} 台节点`}
-                      className="inline-flex items-center gap-1 rounded-[1px] border border-border/70 bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] font-medium text-foreground transition-colors hover:border-foreground/30"
-                    >
-                      <span>{item.name}</span>
-                      <strong className="text-primary font-semibold">{item.count}</strong>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="mt-auto pt-1 text-xs text-muted-foreground">
-              暂无节点数据
-            </div>
-          )}
+        {/* 8. 今日与累计流量 */}
+        <Tile icon={ArrowDownUp} label="今日与累计流量">
+          <Flow
+            down={bytes(sum((n) => n.day_rx))}
+            up={bytes(sum((n) => n.day_tx))}
+            className="mt-1 text-xs font-semibold tracking-tight"
+          />
+          <div className="mt-1.5 text-xs font-medium text-muted-foreground">总计累计</div>
+          <Flow
+            down={bytes(sum((n) => n.total_rx))}
+            up={bytes(sum((n) => n.total_tx))}
+            className="mt-0.5 text-xs text-muted-foreground"
+          />
         </Tile>
       </div>
 

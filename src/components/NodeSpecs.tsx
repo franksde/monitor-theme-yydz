@@ -12,6 +12,7 @@ import {
   Calendar,
   Clock,
   Cpu,
+  Info,
   Server,
   Shield,
 } from "lucide-react"
@@ -311,7 +312,18 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
         </div>
       </div>
 
-      {/* 3. 管理员备忘与备注信息（仅在存在时展示） */}
+      {/* 3. 节点公开介绍与机房说明（公开可见） */}
+      {node.public_remark && (
+        <div className="flex items-start gap-2.5 rounded-[2px] border border-border/70 bg-card/60 p-3 text-xs text-muted-foreground shadow-2xs backdrop-blur-xs">
+          <Info className="mt-0.5 size-3.5 shrink-0 text-primary opacity-80" />
+          <div className="space-y-0.5">
+            <span className="font-semibold text-foreground">节点说明与机房公告</span>
+            <p className="leading-relaxed whitespace-pre-wrap text-foreground/90">{node.public_remark}</p>
+          </div>
+        </div>
+      )}
+
+      {/* 4. 管理员私有备忘信息（仅管理员登录时存在） */}
       {node.remark && (
         <div className="flex items-start gap-2 rounded-[2px] border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
           <Shield className="mt-0.5 size-3.5 shrink-0 opacity-70" />

@@ -3,6 +3,7 @@ import { Moon, Sun, Wrench } from "lucide-react"
 
 import { Globe } from "@/components/Globe"
 import { NodeCard } from "@/components/NodeCard"
+import { NodeFilterBar } from "@/components/NodeFilterBar"
 import { Summary } from "@/components/Summary"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -10,6 +11,7 @@ import { NodeDetailSkeleton } from "@/components/NodeDetailSkeleton"
 import { api, groupsOf, useNodes, type Node } from "@/lib/api"
 import { loadConfig } from "@/lib/config"
 import { resolveNodeGeo } from "@/lib/geo"
+import { filterAndSortNodes, type FilterStatus, type SortMode } from "@/lib/summary"
 
 
 // 站点信息接口类型定义（history_days 在早于按小时归档分档的 hub 版本中不存在）
@@ -276,6 +278,18 @@ function NodeList({
   }, [groupNodes, selectedRegion])
 
 
+  // 关键字搜索、状态过滤与多维指标排序状态
+  const [search, setSearch] = useState("")
+  const [sort, setSort] = useState<SortMode>("default")
+  const [status, setStatus] = useState<FilterStatus>("all")
+
+  // 经多维搜索、在线状态与指标排序后的最终渲染列表
+  const finalNodes = useMemo(() => {
+    return filterAndSortNodes(shown, search, status, sort, offlinePlacement)
+  }, [shown, search, status, sort, offlinePlacement])
+
+  const offlineCount = useMemo(() => shown.filter((n) => !n.online).length, [shown])
+
   const tabs = [
     [null, "全部", nodes.length] as const,
     ...groups.map((g) => [g, g, nodes.filter((n) => n.group === g).length] as const),
@@ -354,34 +368,52 @@ function NodeList({
         </div>
       )}
 
-      {/* 节点卡片列表网格：支持默认混排、全部置后与分区分隔三种排版策略 */}
-      {shown.length === 0 ? (
-        <div className="py-20 text-center text-xs text-muted-foreground animate-fade-in">
-          {selectedRegion ? "该地区暂无符合条件的节点" : "还没有接入任何节点"}
-        </div>
-      ) : offlinePlacement === "separate" ? (
-        <SeparateNodeGrids
-          nodes={shown}
-          showLatency={showLatency}
-          pingLines={pingLines}
-          onOpen={onOpen}
+      {/* 节点搜索、状态快筛与多维指标排序控制条 */}
+      {shown.length > 0 && (
+        <NodeFilterBar
+          search={search}
+          onSearchChange={setSearch}
+          sort={sort}
+          onSortChange={setSort}
+          status={status}
+          onStatusChange={setStatus}
+          totalCount={shown.length}
+          filteredCount={finalNodes.length}
+          offlineCount={offlineCount}
         />
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {(offlinePlacement === "bottom"
-            ? [...shown.filter((n) => n.online), ...shown.filter((n) => !n.online)]
-            : shown
-          ).map((n) => (
-            <NodeCard
-              key={n.id}
-              node={n}
-              showLatency={showLatency}
-              pingLines={pingLines}
-              onOpen={() => onOpen(n.id)}
-            />
-          ))}
-        </div>
       )}
+
+      {/* 节点卡片列表网格：支持默认混排、全部置后与分区分隔三种排版策略 */}
+      <div className="min-h-[360px]">
+        {finalNodes.length === 0 ? (
+          <div className="py-20 text-center text-xs text-muted-foreground animate-fade-in">
+            {search || status !== "all"
+              ? "没有找到符合搜索条件的节点"
+              : selectedRegion
+                ? "该地区暂无符合条件的节点"
+                : "还没有接入任何节点"}
+          </div>
+        ) : offlinePlacement === "separate" && sort === "default" ? (
+          <SeparateNodeGrids
+            nodes={finalNodes}
+            showLatency={showLatency}
+            pingLines={pingLines}
+            onOpen={onOpen}
+          />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {finalNodes.map((n) => (
+              <NodeCard
+                key={n.id}
+                node={n}
+                showLatency={showLatency}
+                pingLines={pingLines}
+                onOpen={() => onOpen(n.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </>
   )
 }
