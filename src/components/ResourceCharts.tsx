@@ -50,6 +50,7 @@ import {
   withGaps,
 } from "@/lib/format"
 import { cn } from "@/lib/utils"
+import { UptimeSlaBar } from "@/components/UptimeSlaBar"
 
 export type MetricPoint = {
   ts: number
@@ -70,6 +71,7 @@ export type ResourceChartsProps = {
   node: Node
   metrics: MetricPoint[]
   hours: number
+  step?: number
 }
 
 // 视图模式定义
@@ -148,7 +150,7 @@ function CustomPieTooltip({ active, payload, total, unitFormatter = bytes }: Pie
   )
 }
 
-export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
+export function ResourceCharts({ node, metrics, hours, step = 60 }: ResourceChartsProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("overview")
   const [hoveredHeatCell, setHoveredHeatCell] = useState<{
     label: string
@@ -800,6 +802,11 @@ export function ResourceCharts({ node, metrics, hours }: ResourceChartsProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 2.5 服务可用性与在线率 SLA 心跳健康条（置于 24 时段负荷活动热力矩阵上方） */}
+      {(viewMode === "overview" || viewMode === "heatmap") && (
+        <UptimeSlaBar metrics={metrics} step={step} hours={hours} />
       )}
 
       {/* 3. 负载时段活动热力图 (Heatmap) */}

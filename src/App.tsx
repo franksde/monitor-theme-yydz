@@ -120,7 +120,10 @@ export default function App() {
     if (me && !me.public_page && !me.authed) location.href = "/admin/"
   }, [me])
 
-  const sorted = [...(nodes ?? [])].sort((a, b) => a.sort - b.sort || a.id - b.id)
+  // 首页节点卡片默认使用节点 name 字符自然排序，同名时按 id 兜底
+  const sorted = [...(nodes ?? [])].sort(
+    (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }) || a.id - b.id
+  )
   const selected = sorted.find((n) => n.id === open)
 
   // 动态同步网页 Title
@@ -150,8 +153,8 @@ export default function App() {
   return (
     <div className="min-h-svh">
       {/* 顶部导航栏：精细微倒角磨砂玻璃质感 */}
-      <header className="sticky top-0 z-30 border-b border-border/80 bg-background/85 backdrop-blur-md transition-colors">
-        <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-2.5 sm:px-6">
+      <header className="sticky top-0 z-30 h-13 border-b border-border/80 bg-background/85 backdrop-blur-md transition-colors">
+        <div className="mx-auto flex h-full max-w-[1400px] items-center gap-3 px-4 sm:px-6">
           {/* 点击站点名返回主列表 */}
           <button
             className="flex items-center gap-2 font-bold tracking-tight text-foreground transition-opacity hover:opacity-75 active:scale-[0.99]"
@@ -298,45 +301,47 @@ function NodeList({
 
   return (
     <>
-      {/* 顶部操作行：分组切换选项卡与地球仪展开/折叠按钮 */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        {groups.length > 0 && (
-          <div role="group" aria-label="分组" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
-            {tabs.map(([value, label, count]) => (
-              <Button
-                key={value === null ? "*" : `=${value}`}
-                aria-pressed={current === value}
-                size="sm"
-                variant={current === value ? "secondary" : "ghost"}
-                className={`shrink-0 rounded-[2px] transition-all duration-150 ${
-                  current === value
-                    ? "border-border/80 font-semibold shadow-2xs"
-                    : "opacity-75 hover:opacity-100"
-                }`}
-                onClick={() => {
-                  onGroup(value)
-                  setSelectedRegion(null) // 切换分组时重置地区筛选
-                }}
-              >
-                <span>{label}</span>
-                <span className="tnum ml-1 rounded-[1px] bg-muted/60 px-1.5 py-0.5 text-xs font-mono text-muted-foreground font-medium">
-                  {count}
-                </span>
-              </Button>
-            ))}
-          </div>
-        )}
+      {/* 顶部操作行：分组切换选项卡与地球仪展开/折叠按钮（粘性置顶展示，页面向下滚动时常驻可见） */}
+      <div className="sticky top-13 z-20 -mt-5 -mx-4 px-4 sm:-mx-6 sm:px-6 py-2 bg-background/85 backdrop-blur-md border-b border-border/60 transition-colors">
+        <div className="flex items-center justify-between gap-2">
+          {groups.length > 0 && (
+            <div role="group" aria-label="分组" className="-mx-1 flex flex-1 min-w-0 gap-1.5 overflow-x-auto px-1 py-0.5 no-scrollbar">
+              {tabs.map(([value, label, count]) => (
+                <Button
+                  key={value === null ? "*" : `=${value}`}
+                  aria-pressed={current === value}
+                  size="sm"
+                  variant={current === value ? "secondary" : "ghost"}
+                  className={`shrink-0 rounded-[2px] transition-all duration-150 ${
+                    current === value
+                      ? "border-border/80 font-semibold shadow-2xs"
+                      : "opacity-75 hover:opacity-100"
+                  }`}
+                  onClick={() => {
+                    onGroup(value)
+                    setSelectedRegion(null) // 切换分组时重置地区筛选
+                  }}
+                >
+                  <span>{label}</span>
+                  <span className="tnum ml-1 rounded-[1px] bg-muted/60 px-1.5 py-0.5 text-xs font-mono text-muted-foreground font-medium">
+                    {count}
+                  </span>
+                </Button>
+              ))}
+            </div>
+          )}
 
-        {/* 地球仪视图显隐切换按钮 */}
-        <div className="ml-auto">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5 rounded-[2px] px-2.5 text-xs text-muted-foreground hover:text-foreground border border-border/40"
-            onClick={() => setGlobeOpen((v) => !v)}
-          >
-            <span>{globeOpen ? "收起地球" : "展开地球"}</span>
-          </Button>
+          {/* 地球仪视图显隐切换按钮（固定不折行） */}
+          <div className="shrink-0 ml-auto">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5 rounded-[2px] px-2.5 text-xs text-muted-foreground hover:text-foreground border border-border/40"
+              onClick={() => setGlobeOpen((v) => !v)}
+            >
+              <span>{globeOpen ? "收起地球" : "展开地球"}</span>
+            </Button>
+          </div>
         </div>
       </div>
 

@@ -255,10 +255,17 @@ export function filterAndSortNodes(
     })
   }
 
-  // 3. 指标多维排序
+  // 3. 指标多维排序（默认使用节点 name 字符自然排序）
   if (sort === "default") {
+    const compareByName = (a: Node, b: Node) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true }) || a.id - b.id
+
     if (offlinePlacement === "bottom") {
-      result = [...result.filter((n) => n.online), ...result.filter((n) => !n.online)]
+      const online = result.filter((n) => n.online).sort(compareByName)
+      const offline = result.filter((n) => !n.online).sort(compareByName)
+      result = [...online, ...offline]
+    } else {
+      result = [...result].sort(compareByName)
     }
   } else {
     result = [...result].sort((a, b) => {

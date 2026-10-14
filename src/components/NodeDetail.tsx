@@ -15,7 +15,6 @@ import { windows } from "@/lib/format"
 import { NodeSpecs } from "@/components/NodeSpecs"
 import { ResourceCharts, type MetricPoint } from "@/components/ResourceCharts"
 import { LatencyDashboard, type PingSample, type ProbeSeries } from "@/components/LatencyDashboard"
-import { UptimeSlaBar, UptimeSlaBarSkeleton } from "@/components/UptimeSlaBar"
 
 /** 探测点名称映射字典 */
 type Probes = Record<string, string>
@@ -167,16 +166,9 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
         </div>
       </div>
 
-      {/* 2.5 历史服务可用性 SLA 与时间轴心跳健康条 */}
+      {/* 3. 遥测核心展示区（内部已在热力矩阵上方内嵌服务可用性 SLA） */}
       {!data ? (
-        <UptimeSlaBarSkeleton hours={hours} />
-      ) : data.metrics && data.metrics.length > 0 ? (
-        <UptimeSlaBar metrics={data.metrics} step={data.step} hours={hours} />
-      ) : null}
-
-      {/* 3. 遥测核心展示区 */}
-      {!data ? (
-        <DetailChartSkeleton tab={tab} />
+        <DetailChartSkeleton tab={tab} hours={hours} />
       ) : failed ? (
         <div
           className="rounded-[2px] border border-destructive/30 bg-destructive/5 py-8 text-center text-sm text-destructive"
@@ -212,6 +204,7 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
         <ResourceCharts
           node={node}
           metrics={data.metrics}
+          step={data.step}
           hours={hours}
         />
       )}

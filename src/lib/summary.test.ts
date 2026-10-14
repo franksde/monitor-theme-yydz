@@ -159,6 +159,11 @@ eq(filterAndSortNodes(sampleNodes, "", "offline", "default").length, 1, "仅看�
 eq(filterAndSortNodes(sampleNodes, "tokyo", "all", "default").length, 1, "搜索 tokyo 过滤出 1 台")
 eq(filterAndSortNodes(sampleNodes, "none", "all", "default").length, 0, "不存在关键字返回 0 台")
 
+const defaultSorted = filterAndSortNodes(sampleNodes, "", "all", "default")
+eq(defaultSorted[0].name, "osaka-lxc", "默认排序按 name 字母排序，osaka-lxc 排第一")
+eq(defaultSorted[1].name, "tokyo-kvm", "默认排序按 name 字母排序，tokyo-kvm 排第二")
+eq(defaultSorted[2].name, "us-offline", "默认排序按 name 字母排序，us-offline 排第三")
+
 const sortedByCpu = filterAndSortNodes(sampleNodes, "", "all", "cpu_desc")
 eq(sortedByCpu[0].name, "osaka-lxc", "CPU 占用最高 85% 排最前")
 eq(sortedByCpu[1].name, "tokyo-kvm", "CPU 占用 20% 排第二")

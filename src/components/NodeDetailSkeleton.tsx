@@ -31,7 +31,13 @@ import { UptimeSlaBarSkeleton } from "@/components/UptimeSlaBar"
 /**
  * 核心遥测指标图表局部骨架屏（针对资源监控 vs 网络延迟双视图精准适配）
  */
-export function DetailChartSkeleton({ tab = "resources" }: { tab?: "resources" | "latency" }) {
+export function DetailChartSkeleton({
+  tab = "resources",
+  hours = 24,
+}: {
+  tab?: "resources" | "latency"
+  hours?: number
+}) {
   if (tab === "latency") {
     return (
       <div className="space-y-4 animate-fade-in">
@@ -333,6 +339,9 @@ export function DetailChartSkeleton({ tab = "resources" }: { tab?: "resources" |
           </div>
         </div>
       </div>
+
+      {/* 3.5 服务可用性与在线率 SLA 骨架条（置于 24 时段热力矩阵上方） */}
+      <UptimeSlaBarSkeleton hours={hours} />
 
       {/* 4. 负载时段活动热力图 (Heatmap) */}
       <div className="rounded-[2px] border border-border/70 bg-card/60 p-3.5 shadow-2xs">
@@ -669,11 +678,8 @@ export function NodeDetailSkeleton() {
         </div>
       </div>
 
-      {/* 3.5 历史服务可用性 SLA 骨架条 */}
-      <UptimeSlaBarSkeleton hours={6} />
-
-      {/* 4. 默认呈现对应真实的资源图表高保真骨架 */}
-      <DetailChartSkeleton tab="resources" />
+      {/* 4. 默认呈现对应真实的资源图表高保真骨架（内部已在热力矩阵上方包含 SLA 骨架） */}
+      <DetailChartSkeleton tab="resources" hours={6} />
     </div>
   )
 }
