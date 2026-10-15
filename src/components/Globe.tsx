@@ -85,15 +85,66 @@ export function Globe({
     return projectRegionBeacons(regions, FLAT_MAP_VIEW.width, FLAT_MAP_VIEW.height)
   }, [regions])
 
-  // 鼠标悬停亮点：计算浮层坐标并弹出小卡片
+  // 鼠标悬停亮点：仅在桌面端（支持 hover 的精细指针设备）计算浮层坐标并弹出小卡片
   const handleBeaconEnter = (
     beacon: ProjectedRegionBeacon,
     e: React.MouseEvent
   ) => {
+    // 小屏或触摸设备不触发任何悬浮卡片
+    if (
+      typeof window !== "undefined" &&
+      (window.innerWidth < 768 || window.matchMedia("(pointer: coarse)").matches)
+    ) {
+      return
+    }
+
     if (leaveTimerRef.current) {
       clearTimeout(leaveTimerRef.current)
       leaveTimerRef.current = null
     }
+    const svg = e.currentTarget.closest("svg")
+    const container = containerRef.current
+    if (svg && container) {
+      const svgRect = svg.getBoundingClientRect()
+      const containerRect = container.getBoundingClientRect()
+      const scaleX = svgRect.width / FLAT_MAP_VIEW.width
+      const scaleY = svgRect.height / FLAT_MAP_VIEW.height
+      const screenX = svgRect.left - containerRect.left + beacon.pt.x * scaleX
+      const screenY = svgRect.top - containerRect.top + beacon.pt.y * scaleY
+      setActiveCard({
+        region: beacon.region,
+        x: screenX,
+        y: screenY,
+        containerWidth: containerRect.width,
+        containerHeight: containerRect.height,
+      })
+    }
+  }
+
+  // 点击亮点：切换地区筛选状态；大屏同步弹出/更新悬浮卡片，小屏仅筛选不弹悬浮卡片
+  const handleBeaconClick = (
+    beacon: ProjectedRegionBeacon,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation()
+    if (leaveTimerRef.current) {
+      clearTimeout(leaveTimerRef.current)
+      leaveTimerRef.current = null
+    }
+
+    // 联动地区筛选状态（小屏与大屏点击均可切换地区筛选）
+    onSelectRegion(selectedRegion === beacon.region.key ? null : beacon.region.key)
+
+    // 小屏/触摸屏设备：仅做地区筛选，坚决不触发悬浮弹窗（杜绝屏幕溢出）
+    if (
+      typeof window !== "undefined" &&
+      (window.innerWidth < 768 || window.matchMedia("(pointer: coarse)").matches)
+    ) {
+      setActiveCard(null)
+      return
+    }
+
+    // 桌面端鼠标点击：更新悬浮卡片
     const svg = e.currentTarget.closest("svg")
     const container = containerRef.current
     if (svg && container) {
@@ -157,6 +208,25 @@ export function Globe({
     { text: "60°S", y: 353 },
   ]
 
+  // 计算桌面端小卡片的智能安全定位（自适应左右与上下，杜绝视口溢出）
+  const cardStyle: React.CSSProperties = activeCard
+    ? {
+        left: `${activeCard.x}px`,
+        top: `${activeCard.y}px`,
+        transform: `translate(${
+          activeCard.x > activeCard.containerWidth * 0.5
+            ? "calc(-100% - 14px)"
+            : "14px"
+        }, ${
+          activeCard.y < 70
+            ? "0%"
+            : activeCard.y > activeCard.containerHeight * 0.75
+              ? "-100%"
+              : "-50%"
+        })`,
+      }
+    : {}
+
   return (
     <Card className="animate-fade-in gap-0 rounded-[2px] border border-border/80 bg-card p-4 shadow-xs">
       {/* 头部标题与控制栏 */}
@@ -196,9 +266,10 @@ export function Globe({
 
       {/* 核心展示区：左侧平面地图大屏，右侧地区控制台 */}
       <div className="mt-3.5 grid gap-4 lg:grid-cols-12 lg:items-center">
-        {/* 平面地图视口（设置 z-30 高于右侧列表，移除 overflow-hidden 确保悬浮弹窗绝不被任何外部容器截断遮挡） */}
+        {/* 平面地图视口 */}
         <div
           ref={containerRef}
+          onClick={() => setActiveCard(null)}
           className="relative z-30 col-span-12 flex items-center justify-center rounded-[2px] border border-border/40 bg-muted/15 p-2 select-none lg:col-span-8"
         >
           <svg
@@ -229,7 +300,7 @@ export function Globe({
               </radialGradient>
             </defs>
 
-            {/* 1. 地图背景底盘 */}
+            {/* 1. 地图背景底盘（点击可关闭当前浮层卡片） */}
             <rect
               x="0"
               y="0"
@@ -239,6 +310,8 @@ export function Globe({
               stroke="var(--color-border)"
               strokeWidth="0.8"
               rx="2"
+              className="cursor-default"
+              onClick={() => setActiveCard(null)}
             />
 
             {/* 2. 工控经纬网格 */}
@@ -306,10 +379,7 @@ export function Globe({
                   className="cursor-pointer"
                   opacity={isSelected ? 1 : 0.25}
                   style={{ transition: "opacity 200ms ease" }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onSelectRegion(selectedRegion === b.region.key ? null : b.region.key)
-                  }}
+                  onClick={(e) => handleBeaconClick(b, e)}
                   onMouseEnter={(e) => handleBeaconEnter(b, e)}
                   onMouseLeave={handleBeaconLeave}
                 >
@@ -376,29 +446,17 @@ export function Globe({
           </svg>
 
           {/* 交互提示微标签 */}
-          <div className="pointer-events-none absolute bottom-3 left-4 text-xs font-mono text-muted-foreground">
-            悬停亮点查看地区节点 · 点击亮点筛选地区
+          <div className="pointer-events-none absolute bottom-3 left-4 text-xs font-mono text-muted-foreground opacity-60">
+            <span className="hidden sm:inline">悬停亮点查看地区节点 · 点击亮点筛选地区</span>
+            <span className="sm:hidden">点击亮点筛选地区</span>
           </div>
 
-          {/* 鼠标移动到亮点上之后显示的小卡片：列出对应节点，主机名 + 在线状态（一个绿色的点点） */}
+          {/* 桌面端专用：鼠标悬停浮动卡片（仅在 md: 及以上精细指针设备展示，小屏移动端严格隐藏，杜绝任何视口溢出） */}
           {activeCard && (
             <div
-              className="absolute z-50 min-w-[190px] max-w-[280px] rounded-[2px] border border-border/80 bg-card/95 p-2.5 text-xs shadow-xl backdrop-blur-xs transition-all duration-75 select-none animate-fade-in"
-              style={{
-                left: `${activeCard.x}px`,
-                top: `${activeCard.y}px`,
-                transform: `translate(${
-                  activeCard.x > activeCard.containerWidth * 0.5
-                    ? "calc(-100% - 14px)"
-                    : "14px"
-                }, ${
-                  activeCard.y < 70
-                    ? "0%"
-                    : activeCard.y > activeCard.containerHeight * 0.75
-                      ? "-100%"
-                      : "-50%"
-                })`,
-              }}
+              className="hidden md:block absolute z-50 min-w-[200px] max-w-[290px] rounded-[2px] border border-border/80 bg-card/95 p-2.5 text-xs shadow-xl backdrop-blur-xs transition-all duration-75 select-none animate-fade-in"
+              style={cardStyle}
+              onClick={(e) => e.stopPropagation()}
               onMouseEnter={handleCardEnter}
               onMouseLeave={handleCardLeave}
             >
@@ -419,7 +477,7 @@ export function Globe({
                 </span>
               </div>
 
-              {/* 节点列表：主机名 + 在线状态（一个绿色的点点） */}
+              {/* 节点列表：主机名 + 在线状态（工控绿灯） */}
               <div className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-0.5">
                 {activeCard.region.nodes.map((node) => (
                   <div
@@ -450,44 +508,47 @@ export function Globe({
           )}
         </div>
 
-        {/* 右侧：地区测控控制台与统计面板（设置 z-10，使左侧地图及弹窗 z-30/z-50 拥有更高绝对层级） */}
-        <div className="relative z-10 col-span-12 flex flex-col gap-2.5 lg:col-span-4">
-          <div className="flex items-center justify-between border-b border-border/50 pb-1.5">
-            <span className="text-xs font-medium text-foreground">地区测控列表</span>
-            {selectedRegion ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-5 rounded-[2px] px-1 text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => onSelectRegion(null)}
+      {/* 右侧：地区测控控制台与统计面板（设置 z-10，使左侧地图及弹窗 z-30/z-50 拥有更高绝对层级） */}
+      <div className="relative z-10 col-span-12 flex flex-col gap-2.5 lg:col-span-4">
+        <div className="flex items-center justify-between border-b border-border/50 pb-1.5">
+          <span className="text-xs font-medium text-foreground">地区测控列表</span>
+          {selectedRegion ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 rounded-[2px] px-1 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => onSelectRegion(null)}
+            >
+              清除筛选
+            </Button>
+          ) : (
+            <span className="text-xs text-muted-foreground font-mono">
+              共 {regions.length} 个区域
+            </span>
+          )}
+        </div>
+
+        {/* 地区列表滚动区（微倒角工业风格） */}
+        <div className="flex max-h-72 flex-col gap-1 overflow-y-auto pr-1">
+          {regions.map((reg) => {
+            const isSelected = selectedRegion === reg.key
+            const flagUrl = FLAGS[reg.country]
+            const percentOnline = Math.round((reg.online / reg.total) * 100)
+
+            return (
+              <div
+                key={reg.key}
+                className={cn(
+                  "flex flex-col rounded-[2px] border transition-colors",
+                  isSelected
+                    ? "border-primary/80 bg-primary/10 text-foreground ring-1 ring-primary/30"
+                    : "border-border/40 bg-muted/20 text-muted-foreground hover:border-border hover:bg-muted/40 hover:text-foreground"
+                )}
               >
-                清除筛选
-              </Button>
-            ) : (
-              <span className="text-xs text-muted-foreground font-mono">
-                共 {regions.length} 个区域
-              </span>
-            )}
-          </div>
-
-          {/* 地区列表滚动区（微倒角工业风格） */}
-          <div className="flex max-h-72 flex-col gap-1 overflow-y-auto pr-1">
-            {regions.map((reg) => {
-              const isSelected = selectedRegion === reg.key
-              const flagUrl = FLAGS[reg.country]
-              const percentOnline = Math.round((reg.online / reg.total) * 100)
-
-              return (
                 <button
-                  key={reg.key}
                   type="button"
                   onClick={() => onSelectRegion(isSelected ? null : reg.key)}
-                  className={cn(
-                    "flex flex-col gap-1 rounded-[2px] border px-2 py-1.5 text-left transition-colors",
-                    isSelected
-                      ? "border-primary/80 bg-primary/10 text-foreground ring-1 ring-primary/30"
-                      : "border-border/40 bg-muted/20 text-muted-foreground hover:border-border hover:bg-muted/40 hover:text-foreground"
-                  )}
+                  className="flex flex-col gap-1 px-2 py-1.5 text-left w-full cursor-pointer"
                 >
                   <div className="flex items-center justify-between gap-1.5">
                     <div className="flex items-center gap-1.5 truncate">
@@ -525,10 +586,38 @@ export function Globe({
                     />
                   </div>
                 </button>
-              )
-            })}
-          </div>
+
+                {/* 选中时展开该地区的节点明细列表（大屏右侧控制台与小屏列表同步可查） */}
+                {isSelected && (
+                  <div className="flex flex-col gap-1 border-t border-border/50 px-2 py-1.5 bg-background/50 animate-fade-in">
+                    {reg.nodes.map((node) => (
+                      <div
+                        key={node.id}
+                        onClick={() => onOpenNode(node.id)}
+                        className="group flex items-center justify-between gap-2 rounded-[2px] px-1.5 py-1 text-xs hover:bg-muted/70 cursor-pointer transition-colors"
+                        title="点击查看此节点监控指标"
+                      >
+                        <span className="truncate font-mono text-xs font-medium text-foreground group-hover:text-primary transition-colors">
+                          {node.name}
+                        </span>
+                        <span
+                          className={cn(
+                            "size-2 shrink-0 rounded-full transition-all",
+                            node.online
+                              ? "bg-online shadow-[0_0_6px_var(--color-online)]"
+                              : "bg-muted-foreground/30"
+                          )}
+                          title={node.online ? "在线" : "离线"}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
+      </div>
       </div>
     </Card>
   )

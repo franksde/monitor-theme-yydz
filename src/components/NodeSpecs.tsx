@@ -7,10 +7,7 @@
 
 import {
   Activity,
-  ArrowDown,
-  ArrowUp,
   Calendar,
-  Clock,
   Cpu,
   Info,
   Server,
@@ -29,10 +26,6 @@ import {
   FOREVER,
   money,
   osName,
-  pair,
-  percent,
-  rate,
-  uptime,
 } from "@/lib/format"
 import { resolveNodeGeo } from "@/lib/geo"
 
@@ -41,19 +34,7 @@ export type NodeSpecsProps = {
 }
 
 export function NodeSpecs({ node }: NodeSpecsProps) {
-  const m = node.metrics
   const geo = resolveNodeGeo(node)
-
-  // 内存与磁盘使用率计算
-  const memPct = m ? percent(m.mem_used, node.mem_total) : null
-  const diskPct = m ? percent(m.disk_used, node.disk_total) : null
-  const swapPct = m && node.swap_total > 0 ? percent(m.swap_used, node.swap_total) : null
-
-  // 流量使用格式化
-  const trafficText =
-    node.traffic_limit > 0
-      ? pair(node.month_rx + node.month_tx, node.traffic_limit)
-      : `${bytes(node.month_rx + node.month_tx)} / ${FOREVER}`
 
   // 到期天数计算
   const daysLeft = node.expires_in !== undefined ? node.expires_in : daysUntil(node.expires_at)
@@ -89,68 +70,26 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
           )}
         </div>
 
-        {/* 右侧：实时关键遥测指标胶囊（运行时长、负载、实时网络速率） */}
-        {/* 右侧：实时关键遥测指标胶囊（移动端单列全宽自适应，桌面端水平排列防抖） */}
-        <div className="grid w-full grid-cols-1 gap-2 text-xs sm:flex sm:w-auto sm:flex-wrap sm:items-center">
-          {/* 1. 运行时间胶囊 */}
-          <div
-            className="flex h-7 w-full items-center justify-between gap-1.5 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border sm:w-auto sm:min-w-[136px]"
-            title="系统连续运行时间"
-          >
-            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
-              <Clock className="size-3 text-muted-foreground/80 shrink-0" />
-              <span>运行</span>
+        {/* 右侧：节点核心网络标识与规格概括 */}
+        <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-muted-foreground">
+          {node.ip && (
+            <div className="flex items-center gap-1 rounded-[1px] border border-border/60 bg-muted/30 px-2 py-0.5">
+              <span className="text-muted-foreground/70">IP:</span>
+              <span className="text-foreground font-medium">{node.ip}</span>
             </div>
-            <span className="tnum font-mono text-xs font-medium text-foreground text-right shrink-0 whitespace-nowrap">
-              {m && m.uptime > 0 ? uptime(m.uptime) : "—"}
+          )}
+          <div className="flex items-center gap-1 rounded-[1px] border border-border/60 bg-muted/30 px-2 py-0.5">
+            <span className="text-muted-foreground/70">规格:</span>
+            <span className="text-foreground font-medium">
+              {node.cpu_cores}C · {bytes(node.mem_total)} · {bytes(node.disk_total)}
             </span>
-          </div>
-
-          {/* 2. 系统负载胶囊 */}
-          <div
-            className="flex h-7 w-full items-center justify-between gap-1.5 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border sm:w-auto sm:min-w-[185px]"
-            title="系统 1 / 5 / 15 分钟平均负载"
-          >
-            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
-              <Activity className="size-3 text-muted-foreground/80 shrink-0" />
-              <span>负载</span>
-            </div>
-            <span className="tnum font-mono text-xs font-medium text-foreground text-right shrink-0 whitespace-nowrap">
-              {m?.load ? m.load.map((l) => l.toFixed(2)).join(" / ") : "— / — / —"}
-            </span>
-          </div>
-
-          {/* 3. 实时网络吞吐胶囊 */}
-          <div
-            className="flex h-7 w-full items-center justify-between gap-2 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs transition-colors hover:border-border sm:w-auto sm:justify-start"
-            title="实时网络吞吐速率 (下行 / 上行)"
-          >
-            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
-              <ArrowDown className="size-3 text-muted-foreground/80 shrink-0 hidden sm:inline" />
-              <span>网速</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 shrink-0">
-                <ArrowDown className="size-3 text-muted-foreground/80 shrink-0 sm:hidden" />
-                <span className="tnum font-mono text-xs font-medium text-foreground text-right shrink-0 whitespace-nowrap sm:w-[68px]">
-                  {m ? rate(m.net_rx) : "0 B/s"}
-                </span>
-              </div>
-              <span className="text-border/80 shrink-0 select-none">·</span>
-              <div className="flex items-center gap-1 shrink-0">
-                <ArrowUp className="size-3 text-muted-foreground/80 shrink-0" />
-                <span className="tnum font-mono text-xs font-medium text-foreground text-right shrink-0 whitespace-nowrap sm:w-[68px]">
-                  {m ? rate(m.net_tx) : "0 B/s"}
-                </span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
 
-      {/* 2. 工控规格指标卡片矩阵：4 格结构化展示，信息层次清晰，间距分明 */}
+      {/* 2. 工控资产规格卡片矩阵：4 格结构化展示静态配置与服务档案 */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {/* 卡片 A：计算与系统架构 */}
+        {/* 卡片 A：系统与计算架构 */}
         <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs transition-colors hover:border-border">
           <div className="flex items-center gap-2 border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
             <Server className="size-3.5 text-primary" />
@@ -173,107 +112,76 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
               <span className="text-muted-foreground">架构 / 虚拟化</span>
               <span className="font-mono font-medium text-foreground">
                 {node.arch} · {node.virt !== "none" ? node.virt : "物理机"}
-                {m ? ` · ${m.procs} 进程` : ""}
               </span>
             </div>
           </div>
         </div>
 
-        {/* 卡片 B：内存与存储容量 */}
+        {/* 卡片 B：硬件物理总容量 */}
         <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs transition-colors hover:border-border">
           <div className="flex items-center gap-2 border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
             <Cpu className="size-3.5 text-primary" />
-            <span>内存与存储容量</span>
+            <span>硬件物理总容量</span>
           </div>
           <div className="divide-y divide-border/30 text-xs">
-            <div className="py-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">物理内存</span>
-                <span className="font-mono font-medium text-foreground">
-                  {bytes(m?.mem_used ?? 0)} / {bytes(node.mem_total)}
-                </span>
-              </div>
-              {memPct !== null && (
-                <div className="mt-1 h-1 w-full overflow-hidden rounded-[1px] bg-muted/80">
-                  <div
-                    className="h-full bg-primary transition-all duration-300"
-                    style={{ width: `${Math.min(100, Math.max(0, memPct))}%` }}
-                  />
-                </div>
-              )}
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">物理内存上限</span>
+              <span className="font-mono font-medium text-foreground">
+                {bytes(node.mem_total)}
+              </span>
             </div>
-
-            <div className="py-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">交换分区 Swap</span>
-                <span className="font-mono font-medium text-foreground">
-                  {node.swap_total > 0
-                    ? `${bytes(m?.swap_used ?? 0)} / ${bytes(node.swap_total)}`
-                    : "未启用"}
-                </span>
-              </div>
-              {swapPct !== null && (
-                <div className="mt-1 h-1 w-full overflow-hidden rounded-[1px] bg-muted/80">
-                  <div
-                    className="h-full bg-chart-3 transition-all duration-300"
-                    style={{ width: `${Math.min(100, Math.max(0, swapPct))}%` }}
-                  />
-                </div>
-              )}
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">交换空间 Swap</span>
+              <span className="font-mono font-medium text-foreground">
+                {node.swap_total > 0 ? bytes(node.swap_total) : "未配置"}
+              </span>
             </div>
-
-            <div className="py-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">磁盘空间</span>
-                <span className="font-mono font-medium text-foreground">
-                  {bytes(m?.disk_used ?? 0)} / {bytes(node.disk_total)}
-                </span>
-              </div>
-              {diskPct !== null && (
-                <div className="mt-1 h-1 w-full overflow-hidden rounded-[1px] bg-muted/80">
-                  <div
-                    className="h-full bg-primary transition-all duration-300"
-                    style={{ width: `${Math.min(100, Math.max(0, diskPct))}%` }}
-                  />
-                </div>
-              )}
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">存储主盘容量</span>
+              <span className="font-mono font-medium text-foreground">
+                {bytes(node.disk_total)}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* 卡片 C：网络吞吐与流量 */}
+        {/* 卡片 C：网络服务与配额 */}
         <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs transition-colors hover:border-border">
           <div className="flex items-center gap-2 border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
             <Activity className="size-3.5 text-primary" />
-            <span>网络吞吐与流量</span>
+            <span>网络计划与配额</span>
           </div>
           <div className="divide-y divide-border/30 text-xs">
             <div className="flex items-center justify-between py-1.5">
-              <span className="text-muted-foreground">实时速率</span>
+              <span className="text-muted-foreground">月度计划配额</span>
               <span className="tnum font-mono font-medium text-foreground">
-                ↓ {rate(m?.net_rx ?? 0)} · ↑ {rate(m?.net_tx ?? 0)}
+                {node.traffic_limit > 0 ? bytes(node.traffic_limit) : FOREVER}
               </span>
             </div>
             <div className="flex items-center justify-between py-1.5">
-              <span className="text-muted-foreground">今日流量</span>
-              <span className="tnum font-mono font-medium text-foreground">
-                ↓ {bytes(node.day_rx)} · ↑ {bytes(node.day_tx)}
+              <span className="text-muted-foreground">重置结算日</span>
+              <span className="font-mono font-medium text-foreground">
+                {node.traffic_reset_day ? `每月 ${node.traffic_reset_day} 日` : "自然月首日"}
               </span>
             </div>
             <div className="flex items-center justify-between py-1.5">
-              <span className="text-muted-foreground">本月用量</span>
-              <span className="tnum font-mono font-medium text-foreground">
-                {trafficText}
+              <span className="text-muted-foreground">计量模式</span>
+              <span className="font-mono font-medium text-foreground">
+                {node.traffic_mode === "rx"
+                  ? "仅计算下行入网"
+                  : node.traffic_mode === "tx"
+                    ? "仅计算上行出网"
+                    : "双向出入网累计"}
               </span>
             </div>
           </div>
         </div>
 
-        {/* 卡片 D：服务周期与连接 */}
+        {/* 卡片 D：服务周期与资费 */}
         <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs transition-colors hover:border-border">
           <div className="flex items-center gap-2 border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
             <Calendar className="size-3.5 text-primary" />
-            <span>服务周期与连接</span>
+            <span>服务周期与资费</span>
           </div>
           <div className="divide-y divide-border/30 text-xs">
             <div className="flex items-center justify-between py-1.5">
@@ -281,7 +189,7 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
               <span className="font-mono font-medium text-foreground">
                 {node.price > 0
                   ? `${money(node.price, node.currency)} / ${cycle(node.billing_cycle)}`
-                  : "免费"}
+                  : "免费 / 赞助"}
               </span>
             </div>
             <div className="flex items-center justify-between py-1.5">
@@ -303,9 +211,9 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
               </div>
             </div>
             <div className="flex items-center justify-between py-1.5">
-              <span className="text-muted-foreground">连接追踪</span>
+              <span className="text-muted-foreground">计费周期</span>
               <span className="font-mono font-medium text-foreground">
-                {m ? `TCP ${m.tcp} · UDP ${m.udp}` : "—"}
+                {cycle(node.billing_cycle) || "长期有效"}
               </span>
             </div>
           </div>

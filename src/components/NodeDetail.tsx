@@ -13,6 +13,7 @@ import { DetailChartSkeleton } from "@/components/NodeDetailSkeleton"
 import { api, type Node } from "@/lib/api"
 import { windows } from "@/lib/format"
 import { NodeSpecs } from "@/components/NodeSpecs"
+import { LiveTelemetryBoard } from "@/components/LiveTelemetryBoard"
 import { ResourceCharts, type MetricPoint } from "@/components/ResourceCharts"
 import { LatencyDashboard, type PingSample, type ProbeSeries } from "@/components/LatencyDashboard"
 
@@ -125,10 +126,13 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
 
   return (
     <div className="animate-fade-in space-y-4">
-      {/* 1. 顶部工控硬件与系统规格总览 */}
+      {/* 1. 顶部工控硬件与系统静态资产规格档案 */}
       <NodeSpecs node={node} />
 
-      {/* 2. 详情监控主视图控制栏（资源/延迟切换与时间范围选择，移动端响应式防换行） */}
+      {/* 2. 实时遥测动态测控驾驶舱（WebSocket 长连接 2s 自动刷新） */}
+      <LiveTelemetryBoard node={node} />
+
+      {/* 3. 历史时序与分析测控主控制栏（资源/延迟切换与时间跨度窗口选择） */}
       <div className="space-y-2.5 border-t border-border/70 pt-3.5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           {/* 标签页选择器 */}

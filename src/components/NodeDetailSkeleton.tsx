@@ -19,6 +19,7 @@ import {
   Layers,
   Network,
   PieChart as PieIcon,
+  Radio,
   Server,
   TrendingUp,
   Wifi,
@@ -47,7 +48,7 @@ export function DetailChartSkeleton({
             <Wifi className="size-4 text-primary shrink-0" />
             <span className="font-semibold text-foreground text-xs whitespace-nowrap">网络延迟拓扑测控</span>
             <Badge className="h-4.5 rounded-[1px] px-1.5 text-[11px] font-mono text-muted-foreground border-border/60 shrink-0">
-              4 条测试线路
+              x 条测试线路
             </Badge>
           </div>
 
@@ -144,13 +145,18 @@ export function DetailChartSkeleton({
 
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* 视图模式切换胶囊（移动端响应式分行与防文字折行） */}
+      {/* 视图模式切换胶囊与历史归档显性标识 */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border/50 pb-2.5">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
-          <Activity className="size-3.5 text-primary shrink-0" />
-          <span className="font-semibold text-foreground whitespace-nowrap">主机资源分析测控</span>
-          <span className="text-xs text-muted-foreground font-medium truncate">
-            · 遥测历史窗口
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+            <Activity className="size-3.5 text-primary shrink-0" />
+            <span className="whitespace-nowrap">历史时序分析测控</span>
+            <span className="font-mono text-[11px] font-normal text-muted-foreground">
+              · Historical Analytics
+            </span>
+          </div>
+          <span className="rounded-[2px] border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-mono font-medium text-primary shadow-2xs">
+            ARCHIVE · 采样窗口：近 {hours} 小时
           </span>
         </div>
 
@@ -178,172 +184,149 @@ export function DetailChartSkeleton({
         </div>
       </div>
 
-      {/* 2. USE 比例图：4 格工控仪表度量条矩阵（真实 Title 与 1:1 结构） */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {/* 卡片 A：CPU 核心负荷 */}
-        <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
-          <div className="flex items-center justify-between text-xs">
-            <span className="flex items-center gap-1.5 font-medium text-foreground">
-              <Cpu className="size-3.5 text-primary" />
-              <span>CPU 核心负荷</span>
-            </span>
-            <Skeleton className="h-4 w-10 rounded-[1px]" />
-          </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
-            <div className="h-full w-1/4 rounded-[1px] bg-primary/40 animate-pulse" />
-          </div>
-          <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
-            <span>窗口均值 —%</span>
-            <span>窗口峰值 —%</span>
-          </div>
-        </div>
-
-        {/* 卡片 B：物理内存占用 */}
-        <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
-          <div className="flex items-center justify-between text-xs">
-            <span className="flex items-center gap-1.5 font-medium text-foreground">
-              <Layers className="size-3.5 text-primary" />
-              <span>物理内存占用</span>
-            </span>
-            <Skeleton className="h-4 w-10 rounded-[1px]" />
-          </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
-            <div className="h-full w-1/2 rounded-[1px] bg-foreground/30 animate-pulse" />
-          </div>
-          <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
-            <span>实时 —</span>
-            <span>均值 —</span>
-          </div>
-        </div>
-
-        {/* 卡片 C：系统存储占用 */}
-        <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
-          <div className="flex items-center justify-between text-xs">
-            <span className="flex items-center gap-1.5 font-medium text-foreground">
-              <HardDrive className="size-3.5 text-primary" />
-              <span>系统存储占用</span>
-            </span>
-            <Skeleton className="h-4 w-10 rounded-[1px]" />
-          </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
-            <div className="h-full w-1/3 rounded-[1px] bg-foreground/30 animate-pulse" />
-          </div>
-          <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
-            <span>已用 —</span>
-            <span>总量 —</span>
-          </div>
-        </div>
-
-        {/* 卡片 D：网络带宽吞吐 */}
-        <div className="rounded-[2px] border border-border/70 bg-card/70 p-3 shadow-2xs backdrop-blur-xs">
-          <div className="flex items-center justify-between text-xs">
-            <span className="flex items-center gap-1.5 font-medium text-foreground">
-              <Activity className="size-3.5 text-primary" />
-              <span>网络带宽吞吐</span>
-            </span>
-            <Skeleton className="h-4 w-14 rounded-[1px]" />
-          </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
-            <div className="h-full w-1/5 rounded-[1px] bg-ok/40 animate-pulse" />
-          </div>
-          <div className="mt-2 flex items-center justify-between text-xs font-mono font-medium text-muted-foreground">
-            <span>均值 ↓ —</span>
-            <span>均值 ↑ —</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. 环形饼图分布模块：3 格卡片（内存分布、磁盘分布、网络流量占比） */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {/* 内存环形饼图 */}
-        <div className="relative overflow-visible flex flex-col rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
-          <div className="border-b border-border/40 pb-1.5 text-xs font-medium text-foreground">
-            物理内存分布比例
-          </div>
-          <div className="relative mt-2 flex h-36 items-center justify-center overflow-visible">
-            <div className="relative flex size-28 items-center justify-center rounded-full border-4 border-muted/80 bg-muted/10 animate-pulse">
-              <Skeleton className="size-16 rounded-full" />
-              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-                <Skeleton className="h-4 w-9 mb-0.5 rounded-[1px]" />
-                <span className="text-xs text-muted-foreground font-medium">已用占比</span>
+      {/* 1. 时间窗口聚合统计指标骨架：与真实 ResourceCharts 窗口均值/峰值 1:1 对齐 */}
+      <div className="space-y-3">
+        {/* 基础资源 4 格度量卡片骨架 */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* 卡片 A：CPU 窗口负荷 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs">
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <Cpu className="size-3.5 text-primary" />
+                <span>CPU 窗口负荷</span>
+              </span>
+              <div className="text-right">
+                <Skeleton className="h-4 w-10 rounded-[1px]" />
               </div>
             </div>
-          </div>
-          <div className="mt-1 flex items-center justify-around border-t border-border/30 pt-2 text-xs font-mono font-medium">
-            <div className="flex items-center gap-1.5">
-              <span className="size-2 rounded-[0.5px] bg-primary" />
-              <span className="text-muted-foreground">已用:</span>
-              <Skeleton className="h-3.5 w-12 rounded-[1px]" />
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+              <div className="h-full w-1/4 rounded-[1px] bg-primary/40 animate-pulse" />
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="size-2 rounded-[0.5px] bg-muted-foreground/30" />
-              <span className="text-muted-foreground">可用:</span>
-              <Skeleton className="h-3.5 w-12 rounded-[1px]" />
+            <div className="mt-3 border-t border-border/30 pt-2 text-[11px] font-mono text-muted-foreground flex items-center justify-between">
+              <span>窗口均值 —%</span>
+              <span className="font-semibold text-foreground">峰值 —%</span>
+            </div>
+          </div>
+
+          {/* 卡片 B：物理内存统计 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs">
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <Layers className="size-3.5 text-primary" />
+                <span>物理内存统计</span>
+              </span>
+              <div className="text-right">
+                <Skeleton className="h-4 w-14 rounded-[1px]" />
+              </div>
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+              <div className="h-full w-1/2 rounded-[1px] bg-foreground/30 animate-pulse" />
+            </div>
+            <div className="mt-3 border-t border-border/30 pt-2 text-[11px] font-mono text-muted-foreground flex items-center justify-between">
+              <span>上限 —</span>
+              <span className="font-medium text-foreground">窗口最高 —</span>
+            </div>
+          </div>
+
+          {/* 卡片 C：网络吞吐均值 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs">
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <Activity className="size-3.5 text-primary" />
+                <span>网络吞吐均值</span>
+              </span>
+              <Skeleton className="h-4 w-20 rounded-[1px]" />
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+              <div className="h-full w-1/3 rounded-[1px] bg-primary/40 animate-pulse" />
+            </div>
+            <div className="mt-3 border-t border-border/30 pt-2 text-[11px] font-mono text-muted-foreground flex items-center justify-between">
+              <span>吞吐峰值 (Peak):</span>
+              <span className="font-semibold text-foreground">↓ — · ↑ —</span>
+            </div>
+          </div>
+
+          {/* 卡片 D：存储与计划用量 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs">
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <HardDrive className="size-3.5 text-primary" />
+                <span>存储与计划用量</span>
+              </span>
+              <Skeleton className="h-4 w-12 rounded-[1px]" />
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+              <div className="h-full w-2/5 rounded-[1px] bg-foreground/30 animate-pulse" />
+            </div>
+            <div className="mt-3 border-t border-border/30 pt-2 text-[11px] font-mono text-muted-foreground flex items-center justify-between">
+              <span>已用 — / —</span>
+              <span className="font-medium text-foreground">月耗 —%</span>
             </div>
           </div>
         </div>
 
-        {/* 磁盘环形饼图 */}
-        <div className="relative overflow-visible flex flex-col rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
-          <div className="border-b border-border/40 pb-1.5 text-xs font-medium text-foreground">
-            存储空间分布比例
-          </div>
-          <div className="relative mt-2 flex h-36 items-center justify-center overflow-visible">
-            <div className="relative flex size-28 items-center justify-center rounded-full border-4 border-muted/80 bg-muted/10 animate-pulse">
-              <Skeleton className="size-16 rounded-full" />
-              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-                <Skeleton className="h-4 w-9 mb-0.5 rounded-[1px]" />
-                <span className="text-xs text-muted-foreground font-medium">占用比例</span>
-              </div>
+        {/* 套接字连接与系统进程 3 格度量卡片骨架 */}
+        <div className="grid gap-3 sm:grid-cols-3">
+          {/* TCP 活跃连接 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs">
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <Network className="size-3.5 text-primary" />
+                <span>TCP 活跃连接数</span>
+              </span>
+              <Skeleton className="h-4 w-10 rounded-[1px]" />
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+              <div className="h-full w-1/3 rounded-[1px] bg-primary/40 animate-pulse" />
+            </div>
+            <div className="mt-3 border-t border-border/30 pt-2 text-[11px] font-mono text-muted-foreground flex items-center justify-between">
+              <span>窗口均值 —</span>
+              <span className="font-semibold text-foreground">峰值 —</span>
             </div>
           </div>
-          <div className="mt-1 flex items-center justify-around border-t border-border/30 pt-2 text-xs font-mono font-medium">
-            <div className="flex items-center gap-1.5">
-              <span className="size-2 rounded-[0.5px] bg-chart-2" />
-              <span className="text-muted-foreground">已用:</span>
-              <Skeleton className="h-3.5 w-12 rounded-[1px]" />
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="size-2 rounded-[0.5px] bg-muted-foreground/30" />
-              <span className="text-muted-foreground">剩余:</span>
-              <Skeleton className="h-3.5 w-12 rounded-[1px]" />
-            </div>
-          </div>
-        </div>
 
-        {/* 流量比例饼图 */}
-        <div className="relative overflow-visible flex flex-col rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs sm:col-span-2 lg:col-span-1">
-          <div className="border-b border-border/40 pb-1.5 text-xs font-medium text-foreground">
-            今日/窗口流量构成
-          </div>
-          <div className="relative mt-2 flex h-36 items-center justify-center overflow-visible">
-            <div className="relative flex size-28 items-center justify-center rounded-full border-4 border-muted/80 bg-muted/10 animate-pulse">
-              <Skeleton className="size-16 rounded-full" />
-              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-                <Skeleton className="h-4 w-10 mb-0.5 rounded-[1px]" />
-                <span className="text-xs text-muted-foreground font-medium">流量主导</span>
-              </div>
+          {/* UDP 监听套接字 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs">
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <Activity className="size-3.5 text-chart-2" />
+                <span>UDP 监听套接字</span>
+              </span>
+              <Skeleton className="h-4 w-10 rounded-[1px]" />
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+              <div className="h-full w-1/4 rounded-[1px] bg-chart-2/40 animate-pulse" />
+            </div>
+            <div className="mt-3 border-t border-border/30 pt-2 text-[11px] font-mono text-muted-foreground flex items-center justify-between">
+              <span>窗口均值 —</span>
+              <span className="font-semibold text-foreground">峰值 —</span>
             </div>
           </div>
-          <div className="mt-1 flex items-center justify-around border-t border-border/30 pt-2 text-xs font-mono font-medium">
-            <div className="flex items-center gap-1.5">
-              <span className="size-2 rounded-[0.5px] bg-ok" />
-              <span className="text-muted-foreground">下行:</span>
-              <Skeleton className="h-3.5 w-12 rounded-[1px]" />
+
+          {/* 系统进程总数 */}
+          <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs">
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <Layers className="size-3.5 text-chart-1" />
+                <span>系统活跃进程 (Procs)</span>
+              </span>
+              <Skeleton className="h-4 w-10 rounded-[1px]" />
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="size-2 rounded-[0.5px] bg-chart-1" />
-              <span className="text-muted-foreground">上行:</span>
-              <Skeleton className="h-3.5 w-12 rounded-[1px]" />
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+              <div className="h-full w-2/5 rounded-[1px] bg-chart-1/40 animate-pulse" />
+            </div>
+            <div className="mt-3 border-t border-border/30 pt-2 text-[11px] font-mono text-muted-foreground flex items-center justify-between">
+              <span>窗口均值 —</span>
+              <span className="font-semibold text-foreground">峰值 —</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 3.5 服务可用性与在线率 SLA 骨架条（置于 24 时段热力矩阵上方） */}
+      {/* 2. 服务可用性与在线率 SLA 骨架条（置于 24 时段热力矩阵上方） */}
       <UptimeSlaBarSkeleton hours={hours} />
 
-      {/* 4. 负载时段活动热力图 (Heatmap) */}
+      {/* 3. 负载时段活动热力图 (Heatmap) */}
       <div className="rounded-[2px] border border-border/70 bg-card/60 p-3.5 shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
@@ -387,9 +370,9 @@ export function DetailChartSkeleton({
         </div>
       </div>
 
-      {/* 5. 时序曲线走势图（4 张完整卡片，真实 Title 与真实 h-40 高度） */}
-      <div className="space-y-4 pt-1">
-        {/* CPU 曲线 */}
+      {/* 4. 核心 2x2 并列时序走势图骨架（与全景仪表 overview 1:1 精准像素级对齐，杜绝高度抖动） */}
+      <div className="grid gap-3 grid-cols-1 lg:grid-cols-2 pt-1">
+        {/* CPU 曲线骨架 */}
         <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
           <div className="flex items-center justify-between border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
             <span className="flex items-center gap-1.5">
@@ -409,7 +392,7 @@ export function DetailChartSkeleton({
           </div>
         </div>
 
-        {/* 物理内存趋势曲线 */}
+        {/* 物理内存趋势曲线骨架 */}
         <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
           <div className="flex items-center justify-between border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
             <span className="flex items-center gap-1.5">
@@ -429,7 +412,7 @@ export function DetailChartSkeleton({
           </div>
         </div>
 
-        {/* 网络速率对数走势 */}
+        {/* 网络速率对数走势骨架 */}
         <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
           <div className="flex items-center justify-between border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
             <span className="flex items-center gap-1.5">
@@ -449,15 +432,15 @@ export function DetailChartSkeleton({
           </div>
         </div>
 
-        {/* 系统磁盘容量走势 */}
+        {/* TCP & UDP 并发连接走势图骨架 */}
         <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
           <div className="flex items-center justify-between border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
             <span className="flex items-center gap-1.5">
-              <HardDrive className="size-3.5 text-primary" />
-              <span>系统磁盘容量</span>
+              <Network className="size-3.5 text-primary" />
+              <span>TCP / UDP 网络套接字时序走势</span>
             </span>
             <span className="font-mono text-xs font-normal text-muted-foreground">
-              当前已用: —
+              当前: TCP — · UDP —
             </span>
           </div>
           <div className="mt-2 flex h-40 w-full flex-col justify-between rounded-[2px] border border-border/30 bg-muted/10 p-3">
@@ -467,6 +450,152 @@ export function DetailChartSkeleton({
               <div className="h-px w-full border-t border-dashed border-border" />
             </div>
           </div>
+          <div className="mt-2 flex items-center justify-end gap-4 border-t border-border/30 pt-1.5 text-xs font-mono">
+            <div className="flex items-center gap-1.5">
+              <span className="size-2 rounded-[0.5px] bg-primary" />
+              <span className="text-muted-foreground">TCP 活跃连接</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="size-2 rounded-[0.5px] bg-chart-2" />
+              <span className="text-muted-foreground">UDP 监听套接字</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 实时遥测动态测控驾驶舱骨架屏 (Live Telemetry Dashboard Skeleton)
+ * 与 LiveTelemetryBoard 真实组件 1:1 像素级高度与层级对齐
+ */
+export function LiveTelemetryBoardSkeleton() {
+  return (
+    <div className="space-y-2.5 rounded-[2px] border border-border/80 bg-card/70 p-3 shadow-2xs backdrop-blur-xs sm:p-3.5">
+      {/* 顶部标题栏：显性 LIVE 标识、长连接刷新提示与心跳状态 */}
+      <div className="flex flex-col gap-2 border-b border-border/50 pb-2.5 sm:flex-row sm:items-center sm:justify-between">
+        {/* 左侧：实时状态主标识 */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+            <Radio className="size-3.5 text-online" />
+            <span>实时遥测驾驶舱</span>
+            <span className="font-mono text-[11px] font-normal text-muted-foreground">
+              · Live Telemetry
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 rounded-[2px] border border-online/30 bg-online/10 px-2 py-0.5 text-[11px] font-mono font-medium text-online shadow-2xs">
+            <span className="size-1.5 rounded-[0.5px] bg-online pulse-online" />
+            <span>LIVE 实时流 · 2s 自动推送</span>
+          </div>
+        </div>
+
+        {/* 右侧：心跳上报频率与系统连续运行时长 */}
+        <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-muted-foreground sm:justify-end">
+          <div className="flex items-center gap-1 rounded-[1px] border border-border/60 bg-muted/40 px-2 py-0.5">
+            <Clock className="size-3 text-muted-foreground/70 shrink-0" />
+            <span>运行:</span>
+            <Skeleton className="h-3.5 w-14 rounded-[1px]" />
+          </div>
+
+          <div className="flex items-center gap-1 rounded-[1px] border border-border/60 bg-muted/40 px-2 py-0.5">
+            <span>心跳:</span>
+            <Skeleton className="h-3.5 w-10 rounded-[1px]" />
+          </div>
+        </div>
+      </div>
+
+      {/* 4 格工控实时动态仪表矩阵 */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {/* 卡片 1：实时 CPU 负荷与系统负载 */}
+        <div className="flex flex-col justify-between rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
+          <div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <Cpu className="size-3.5 text-primary" />
+                <span>CPU 实时负荷</span>
+              </span>
+              <Skeleton className="h-4 w-12 rounded-[1px]" />
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+              <div className="h-full w-1/4 rounded-[1px] bg-primary/40 animate-pulse" />
+            </div>
+          </div>
+          <div className="mt-3 border-t border-border/30 pt-2 text-[11px] font-mono text-muted-foreground flex items-center justify-between">
+            <span className="text-muted-foreground/80">系统负载:</span>
+            <Skeleton className="h-3.5 w-24 rounded-[1px]" />
+          </div>
+        </div>
+
+        {/* 卡片 2：实时物理内存与 Swap */}
+        <div className="flex flex-col justify-between rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
+          <div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <Layers className="size-3.5 text-primary" />
+                <span>物理内存占用</span>
+              </span>
+              <Skeleton className="h-4 w-20 rounded-[1px]" />
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+              <div className="h-full w-2/5 rounded-[1px] bg-primary/40 animate-pulse" />
+            </div>
+          </div>
+          <div className="mt-3 border-t border-border/30 pt-2 text-[11px] font-mono text-muted-foreground flex items-center justify-between">
+            <span className="text-muted-foreground/80">交换空间:</span>
+            <Skeleton className="h-3.5 w-20 rounded-[1px]" />
+          </div>
+        </div>
+
+        {/* 卡片 3：实时瞬时带宽与在线连接 */}
+        <div className="flex flex-col justify-between rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
+          <div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <Activity className="size-3.5 text-primary" />
+                <span>实时网络速率</span>
+              </span>
+              <div className="flex items-center gap-1.5 font-mono text-xs">
+                <span className="flex items-center gap-0.5 text-primary">
+                  <ArrowDown className="size-3" />
+                  <Skeleton className="h-3.5 w-12 rounded-[1px]" />
+                </span>
+                <span className="text-border select-none">·</span>
+                <span className="flex items-center gap-0.5 text-foreground/90">
+                  <ArrowUp className="size-3" />
+                  <Skeleton className="h-3.5 w-12 rounded-[1px]" />
+                </span>
+              </div>
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+              <div className="h-full w-1/3 rounded-[1px] bg-primary/40 animate-pulse" />
+            </div>
+          </div>
+          <div className="mt-3 border-t border-border/30 pt-2 text-[11px] font-mono text-muted-foreground flex items-center justify-between">
+            <span className="text-muted-foreground/80">通信连接:</span>
+            <Skeleton className="h-3.5 w-24 rounded-[1px]" />
+          </div>
+        </div>
+
+        {/* 卡片 4：实时磁盘存储与运行进程 */}
+        <div className="flex flex-col justify-between rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
+          <div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <HardDrive className="size-3.5 text-primary" />
+                <span>存储空间占用</span>
+              </span>
+              <Skeleton className="h-4 w-20 rounded-[1px]" />
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80">
+              <div className="h-full w-2/5 rounded-[1px] bg-primary/40 animate-pulse" />
+            </div>
+          </div>
+          <div className="mt-3 border-t border-border/30 pt-2 text-[11px] font-mono text-muted-foreground flex items-center justify-between">
+            <span className="text-muted-foreground/80">活跃进程 / 今日吞吐:</span>
+            <Skeleton className="h-3.5 w-28 rounded-[1px]" />
+          </div>
         </div>
       </div>
     </div>
@@ -475,12 +604,12 @@ export function DetailChartSkeleton({
 
 /**
  * 详情页全景完整页面骨架屏（用于初次进入详情页、直接访问链接及 Suspense 等待）
- * 包含顶部全景控制栏、4 格系统规格卡片矩阵、控制栏以及完整的 Title 文字！
+ * 包含静态资产档案、实时遥测驾驶舱、时间控制栏及历史时序测控完整高保真骨架！
  */
 export function NodeDetailSkeleton() {
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* 1. 顶部全景控制栏（与 NodeSpecs 真实结构与高度 1:1 对齐） */}
+      {/* 1. 顶部全景控制栏：主机标识与规格概括（与 NodeSpecs 真实结构与高度 1:1 对齐） */}
       <div className="flex flex-col gap-3 rounded-[2px] border border-border/80 bg-card/80 p-3 shadow-2xs backdrop-blur-xs sm:p-3.5 lg:flex-row lg:items-center lg:justify-between">
         {/* 左侧：主机标识与属性徽章 */}
         <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-2.5">
@@ -491,59 +620,22 @@ export function NodeDetailSkeleton() {
           <Skeleton className="h-5 w-14 rounded-[2px] hidden sm:inline-block" />
         </div>
 
-        {/* 右侧：实时关键遥测指标胶囊（移动端单列全宽自适应，桌面端水平排列防抖） */}
-        <div className="grid w-full grid-cols-1 gap-2 text-xs sm:flex sm:w-auto sm:flex-wrap sm:items-center">
-          {/* 1. 运行时间胶囊 */}
-          <div
-            className="flex h-7 w-full items-center justify-between gap-1.5 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs sm:w-auto sm:min-w-[136px]"
-            title="系统连续运行时间"
-          >
-            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
-              <Clock className="size-3 text-muted-foreground/80 shrink-0" />
-              <span>运行</span>
-            </div>
-            <Skeleton className="h-3.5 w-14 rounded-[1px]" />
-          </div>
-
-          {/* 2. 系统负载胶囊 */}
-          <div
-            className="flex h-7 w-full items-center justify-between gap-1.5 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs sm:w-auto sm:min-w-[185px]"
-            title="系统 1 / 5 / 15 分钟平均负载"
-          >
-            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
-              <Activity className="size-3 text-muted-foreground/80 shrink-0" />
-              <span>负载</span>
-            </div>
+        {/* 右侧：节点核心网络标识与规格概括 */}
+        <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-muted-foreground">
+          <div className="flex items-center gap-1 rounded-[1px] border border-border/60 bg-muted/30 px-2 py-0.5">
+            <span className="text-muted-foreground/70">IP:</span>
             <Skeleton className="h-3.5 w-24 rounded-[1px]" />
           </div>
-
-          {/* 3. 实时网络吞吐胶囊 */}
-          <div
-            className="flex h-7 w-full items-center justify-between gap-2 rounded-[2px] border border-border/70 bg-muted/30 px-2.5 shadow-2xs sm:w-auto sm:justify-start"
-            title="实时网络吞吐速率 (下行 / 上行)"
-          >
-            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
-              <ArrowDown className="size-3 text-muted-foreground/80 shrink-0 hidden sm:inline" />
-              <span>网速</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 shrink-0">
-                <ArrowDown className="size-3 text-muted-foreground/80 shrink-0 sm:hidden" />
-                <Skeleton className="h-3.5 w-12 rounded-[1px]" />
-              </div>
-              <span className="text-border/80 shrink-0 select-none">·</span>
-              <div className="flex items-center gap-1 shrink-0">
-                <ArrowUp className="size-3 text-muted-foreground/80 shrink-0" />
-                <Skeleton className="h-3.5 w-12 rounded-[1px]" />
-              </div>
-            </div>
+          <div className="flex items-center gap-1 rounded-[1px] border border-border/60 bg-muted/30 px-2 py-0.5">
+            <span className="text-muted-foreground/70">规格:</span>
+            <Skeleton className="h-3.5 w-32 rounded-[1px]" />
           </div>
         </div>
       </div>
 
-      {/* 2. 工控规格指标卡片矩阵：4 格结构化展示，包含真实卡片 Title 与真实字段名称 */}
+      {/* 2. 工控资产规格卡片矩阵：4 格结构化展示静态配置与服务档案 */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {/* 卡片 1：系统与计算架构 */}
+        {/* 卡片 A：系统与计算架构 */}
         <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs">
           <div className="flex items-center gap-2 border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
             <Server className="size-3.5 text-primary" />
@@ -565,89 +657,77 @@ export function NodeDetailSkeleton() {
           </div>
         </div>
 
-        {/* 卡片 2：内存与存储容量 */}
+        {/* 卡片 B：硬件物理总容量 */}
         <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs">
           <div className="flex items-center gap-2 border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
             <Cpu className="size-3.5 text-primary" />
-            <span>内存与存储容量</span>
+            <span>硬件物理总容量</span>
           </div>
           <div className="divide-y divide-border/30 text-xs">
-            <div className="py-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">物理内存</span>
-                <Skeleton className="h-3.5 w-24 rounded-[1px]" />
-              </div>
-              <div className="mt-1 h-1 w-full overflow-hidden rounded-[1px] bg-muted/80">
-                <div className="h-full w-2/5 rounded-[1px] bg-primary/40 animate-pulse" />
-              </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">物理内存上限</span>
+              <Skeleton className="h-3.5 w-20 rounded-[1px]" />
             </div>
-            <div className="py-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">交换分区 Swap</span>
-                <Skeleton className="h-3.5 w-20 rounded-[1px]" />
-              </div>
-              <div className="mt-1 h-1 w-full overflow-hidden rounded-[1px] bg-muted/80">
-                <div className="h-full w-1/5 rounded-[1px] bg-chart-3/40 animate-pulse" />
-              </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">交换空间 Swap</span>
+              <Skeleton className="h-3.5 w-20 rounded-[1px]" />
             </div>
-            <div className="py-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">磁盘空间</span>
-                <Skeleton className="h-3.5 w-24 rounded-[1px]" />
-              </div>
-              <div className="mt-1 h-1 w-full overflow-hidden rounded-[1px] bg-muted/80">
-                <div className="h-full w-1/3 rounded-[1px] bg-primary/40 animate-pulse" />
-              </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">存储主盘容量</span>
+              <Skeleton className="h-3.5 w-20 rounded-[1px]" />
             </div>
           </div>
         </div>
 
-        {/* 卡片 3：网络吞吐与流量 */}
+        {/* 卡片 C：网络计划与配额 */}
         <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs">
           <div className="flex items-center gap-2 border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
             <Activity className="size-3.5 text-primary" />
-            <span>网络吞吐与流量</span>
+            <span>网络计划与配额</span>
           </div>
           <div className="divide-y divide-border/30 text-xs">
             <div className="flex items-center justify-between py-1.5">
-              <span className="text-muted-foreground">实时速率</span>
-              <Skeleton className="h-3.5 w-28 rounded-[1px]" />
-            </div>
-            <div className="flex items-center justify-between py-1.5">
-              <span className="text-muted-foreground">今日流量</span>
+              <span className="text-muted-foreground">月度计划配额</span>
               <Skeleton className="h-3.5 w-24 rounded-[1px]" />
             </div>
             <div className="flex items-center justify-between py-1.5">
-              <span className="text-muted-foreground">本月用量</span>
-              <Skeleton className="h-3.5 w-28 rounded-[1px]" />
+              <span className="text-muted-foreground">重置结算日</span>
+              <Skeleton className="h-3.5 w-20 rounded-[1px]" />
+            </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">计量模式</span>
+              <Skeleton className="h-3.5 w-24 rounded-[1px]" />
             </div>
           </div>
         </div>
 
-        {/* 卡片 4：服务周期与连接 */}
+        {/* 卡片 D：服务周期与资费 */}
         <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs">
           <div className="flex items-center gap-2 border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
             <Calendar className="size-3.5 text-primary" />
-            <span>服务周期与连接</span>
+            <span>服务周期与资费</span>
           </div>
           <div className="divide-y divide-border/30 text-xs">
             <div className="flex items-center justify-between py-1.5">
               <span className="text-muted-foreground">资费周期</span>
-              <Skeleton className="h-3.5 w-20 rounded-[1px]" />
-            </div>
-            <div className="flex items-center justify-between py-1.5">
-              <span className="text-muted-foreground">到期时间</span>
               <Skeleton className="h-3.5 w-24 rounded-[1px]" />
             </div>
             <div className="flex items-center justify-between py-1.5">
-              <span className="text-muted-foreground">连接追踪</span>
+              <span className="text-muted-foreground">到期时间</span>
+              <Skeleton className="h-3.5 w-28 rounded-[1px]" />
+            </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-muted-foreground">计费周期</span>
               <Skeleton className="h-3.5 w-20 rounded-[1px]" />
             </div>
           </div>
         </div>
       </div>
 
-      {/* 3. 详情监控主视图控制栏（与 NodeDetail 控制栏 1:1 对齐，移动端响应式防换行） */}
+      {/* 3. 实时遥测驾驶舱高保真骨架 */}
+      <LiveTelemetryBoardSkeleton />
+
+      {/* 4. 详情监控主视图控制栏（与 NodeDetail 控制栏 1:1 对齐，移动端响应式防换行） */}
       <div className="space-y-2.5 border-t border-border/70 pt-3.5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           {/* 标签页选择器（与真实 NodeDetail TABS: '资源' / '网络延迟' 1:1 完全对齐） */}
@@ -678,7 +758,7 @@ export function NodeDetailSkeleton() {
         </div>
       </div>
 
-      {/* 4. 默认呈现对应真实的资源图表高保真骨架（内部已在热力矩阵上方包含 SLA 骨架） */}
+      {/* 5. 默认呈现对应真实的资源图表高保真骨架（内部已在热力矩阵上方包含 SLA 骨架） */}
       <DetailChartSkeleton tab="resources" hours={6} />
     </div>
   )

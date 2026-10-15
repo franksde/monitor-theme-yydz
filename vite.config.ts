@@ -21,6 +21,13 @@ export default defineConfig({
   // front of it routes by.
   server: {
     host: '0.0.0.0',
-    proxy: { "/api": { target: process.env.MONITOR_HUB || "http://127.0.0.1:9911", changeOrigin: true, ws: true } },
+    proxy: {
+      "/api": {
+        target: process.env.MONITOR_HUB || "http://127.0.0.1:9911",
+        changeOrigin: true,
+        ws: true,
+        secure: false,
+      },
+    },
   },
 })
