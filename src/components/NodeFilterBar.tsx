@@ -1,5 +1,5 @@
 import { useId } from "react"
-import { ArrowUpDown, Search, X } from "lucide-react"
+import { ArrowUpDown, LayoutGrid, Rows3, Search, StretchHorizontal, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -13,6 +13,15 @@ export type SortMode =
 
 export type FilterStatus = "all" | "online" | "offline"
 
+/** 节点列表的展示方式：卡片、紧凑卡片、一行一台的表格 */
+export type ViewMode = "card" | "compact" | "table"
+
+const VIEW_OPTIONS: { value: ViewMode; label: string; icon: typeof LayoutGrid }[] = [
+  { value: "card", label: "卡片", icon: LayoutGrid },
+  { value: "compact", label: "紧凑", icon: StretchHorizontal },
+  { value: "table", label: "列表", icon: Rows3 },
+]
+
 export type NodeFilterBarProps = {
   search: string
   onSearchChange: (value: string) => void
@@ -23,6 +32,8 @@ export type NodeFilterBarProps = {
   totalCount: number
   filteredCount: number
   offlineCount: number
+  view: ViewMode
+  onViewChange: (view: ViewMode) => void
 }
 
 const SORT_OPTIONS: { label: string; value: SortMode }[] = [
@@ -49,6 +60,8 @@ export function NodeFilterBar({
   totalCount,
   filteredCount,
   offlineCount,
+  view,
+  onViewChange,
 }: NodeFilterBarProps) {
   const searchInputId = useId()
   const isFiltered = search.trim() !== "" || status !== "all" || sort !== "default"
@@ -145,6 +158,25 @@ export function NodeFilterBar({
 
       {/* 右侧：多维指标排序下拉（固定右对齐，暗色模式背景自适应） */}
       <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto sm:ml-auto">
+        {/* 视图切换：卡片 / 紧凑 / 列表 */}
+        <div role="group" aria-label="视图" className="mr-1.5 flex items-center gap-0.5 rounded-[2px] border border-border/60 bg-muted/30 p-0.5">
+          {VIEW_OPTIONS.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={view === value}
+              title={label}
+              onClick={() => onViewChange(value)}
+              className={cn(
+                "inline-flex items-center gap-1 whitespace-nowrap rounded-[1px] px-1.5 py-0.5 font-medium transition-colors",
+                view === value ? "bg-primary text-primary-foreground shadow-2xs" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon className="size-3" />
+              <span className="hidden md:inline">{label}</span>
+            </button>
+          ))}
+        </div>
         <ArrowUpDown className="size-3 shrink-0 text-muted-foreground" />
         <select
           value={sort}

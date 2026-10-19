@@ -29,7 +29,7 @@ const DISTROS: [string, SimpleIcon][] = [
 // A node that has reported once has told the hub its shape -- cores, memory,
 // disk -- and the hub retains its traffic totals whether connected or not. A node
 // that never connected is the only case with nothing to show.
-function deployed(node: Node) {
+export function deployed(node: Node) {
   return node.cpu_cores > 0 || node.mem_total > 0
 }
 
@@ -110,17 +110,27 @@ function OsIcon({ os }: { os: string }) {
 }
 
 // 流量使用计算与格式化
-function trafficFoot(node: Node) {
+export function trafficFoot(node: Node) {
   return node.traffic_limit > 0
     ? pair(monthUsage(node), node.traffic_limit)
     : `${bytes(monthUsage(node))} / ${FOREVER}`
 }
 
+/** 距到期的天数，null 为永不到期 */
+export function expiryDays(node: Node) {
+  return node.expires_in !== undefined ? node.expires_in : daysUntil(node.expires_at)
+}
+
+/** 到期配色：≤3 天或已过期红色，≤7 天黄色 */
+export function expiryTone(days: number) {
+  return days <= 3 ? "text-destructive font-semibold" : days <= 7 ? "text-warn font-semibold" : "text-muted-foreground"
+}
+
 /** 到期日指示器：过期标红，临期预警，永久显示无限符号 */
 function Expiry({ node }: { node: Node }) {
-  const days = node.expires_in !== undefined ? node.expires_in : daysUntil(node.expires_at)
+  const days = expiryDays(node)
   if (days === null) return <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground" title="永不到期">{FOREVER}</span>
-  const tone = days <= 3 ? "text-destructive font-semibold" : days <= 7 ? "text-warn font-semibold" : "text-muted-foreground"
+  const tone = expiryTone(days)
   return (
     <span className={cn("tnum shrink-0 whitespace-nowrap text-xs transition-colors", tone)}>
       {days < 0 ? `已过期 ${-days} 天` : days === 0 ? "今日到期" : `${days} 天后到期`}
@@ -136,14 +146,18 @@ export function NodeCard({
   node,
   showLatency = true,
   pingLines = "",
+  compact = false,
   onOpen,
 }: {
   node: Node
   showLatency?: boolean
   pingLines?: string
+  /** 紧凑：指标细节与百分比同一行，网速去掉标签行 */
+  compact?: boolean
   onOpen: () => void
 }) {
   const m = node.metrics
+  const load = m ? (compact ? m.load[0].toFixed(2) : m.load.map((n) => n.toFixed(2)).join(" ")) : "—"
 
   return (
     <Card
@@ -184,49 +198,57 @@ export function NodeCard({
 
         {/* 资源指标度量网格：不论已部署还是待接入，均保持对齐网格结构 */}
         {deployed(node) ? (
-          <div className="mt-4 flex flex-col gap-2.5">
+          <div className={cn("flex flex-col", compact ? "mt-3 gap-2" : "mt-4 gap-2.5")}>
             <Meter
               label="CPU"
+              compact={compact}
               pct={m ? m.cpu : null}
-              foot={`${node.cpu_cores} 核 · 负载 ${m ? m.load.map((n) => n.toFixed(2)).join(" ") : "—"}`}
+              foot={compact ? `${node.cpu_cores} 核 · ${load}` : `${node.cpu_cores} 核 · 负载 ${load}`}
             />
             <Meter
               label="内存"
+              compact={compact}
               pct={m ? percent(m.mem_used, m.mem_total) : null}
               foot={m ? pair(m.mem_used, m.mem_total) : bytes(node.mem_total)}
             />
             <Meter
               label="硬盘"
+              compact={compact}
               pct={m ? percent(m.disk_used, m.disk_total) : null}
               foot={m ? pair(m.disk_used, m.disk_total) : bytes(node.disk_total)}
             />
             {node.traffic_limit > 0 ? (
-              <Meter label="流量" pct={percent(monthUsage(node), node.traffic_limit)} foot={trafficFoot(node)} />
+              <Meter label="流量" compact={compact} pct={percent(monthUsage(node), node.traffic_limit)} foot={trafficFoot(node)} />
             ) : (
               <MeterText label="流量" value={trafficFoot(node)} />
             )}
           </div>
         ) : (
-          <div className="mt-4 flex flex-col gap-2.5">
-            <Meter label="CPU" pct={null} foot="未就绪" />
-            <Meter label="内存" pct={null} foot="未就绪" />
-            <Meter label="硬盘" pct={null} foot="未就绪" />
+          <div className={cn("flex flex-col", compact ? "mt-3 gap-2" : "mt-4 gap-2.5")}>
+            <Meter label="CPU" compact={compact} pct={null} foot="未就绪" />
+            <Meter label="内存" compact={compact} pct={null} foot="未就绪" />
+            <Meter label="硬盘" compact={compact} pct={null} foot="未就绪" />
             <MeterText label="流量" value="未就绪" />
           </div>
         )}
 
         {/* 实时网速（主）与累计流量（次） */}
-        <div className="mt-4 grid grid-cols-2 gap-x-4 border-t border-border/60 pt-3">
+        <div className={cn("grid grid-cols-2 gap-x-4 border-t border-border/60", compact ? "mt-3 pt-2.5" : "mt-4 pt-3")}>
           {([
             ["下行", ArrowDown, m ? rate(m.net_rx) : "—", node.total_rx],
             ["上行", ArrowUp, m ? rate(m.net_tx) : "—", node.total_tx],
           ] as const).map(([label, Icon, now, total]) => (
             <div key={label} className="flex min-w-0 flex-col gap-0.5">
-              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Icon className="size-3" />
-                {label}
+              {!compact && (
+                <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <Icon className="size-3" />
+                  {label}
+                </span>
+              )}
+              <span className="tnum inline-flex items-center gap-1 truncate whitespace-nowrap font-mono text-sm font-semibold text-foreground">
+                {compact && <Icon className="size-3 shrink-0 text-muted-foreground" />}
+                {now}
               </span>
-              <span className="tnum truncate whitespace-nowrap font-mono text-sm font-semibold text-foreground">{now}</span>
               <span className="tnum truncate whitespace-nowrap font-mono text-[11px] text-muted-foreground">
                 累计 {deployed(node) ? bytes(total) : "—"}
               </span>

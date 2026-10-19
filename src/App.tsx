@@ -3,7 +3,8 @@ import { Moon, Sun, Wrench } from "lucide-react"
 
 import { Globe } from "@/components/Globe"
 import { NodeCard } from "@/components/NodeCard"
-import { NodeFilterBar } from "@/components/NodeFilterBar"
+import { NodeFilterBar, type ViewMode } from "@/components/NodeFilterBar"
+import { NodeTable } from "@/components/NodeTable"
 import { Summary } from "@/components/Summary"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -285,6 +286,15 @@ function NodeList({
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState<SortMode>("default")
   const [status, setStatus] = useState<FilterStatus>("all")
+  const [view, setView] = useState<ViewMode>(readView)
+  const changeView = (next: ViewMode) => {
+    setView(next)
+    try {
+      localStorage.setItem(VIEW_KEY, next)
+    } catch {
+      // 隐私模式等拿不到存储时只在本次生效
+    }
+  }
 
   // 经多维搜索、在线状态与指标排序后的最终渲染列表
   const finalNodes = useMemo(() => {
@@ -385,6 +395,8 @@ function NodeList({
           totalCount={shown.length}
           filteredCount={finalNodes.length}
           offlineCount={offlineCount}
+          view={view}
+          onViewChange={changeView}
         />
       )}
 
@@ -398,11 +410,14 @@ function NodeList({
                 ? "该地区暂无符合条件的节点"
                 : "还没有接入任何节点"}
           </div>
+        ) : view === "table" ? (
+          <NodeTable nodes={finalNodes} showLatency={showLatency} pingLines={pingLines} onOpen={onOpen} />
         ) : offlinePlacement === "separate" && sort === "default" ? (
           <SeparateNodeGrids
             nodes={finalNodes}
             showLatency={showLatency}
             pingLines={pingLines}
+            compact={view === "compact"}
             onOpen={onOpen}
           />
         ) : (
@@ -413,6 +428,7 @@ function NodeList({
                 node={n}
                 showLatency={showLatency}
                 pingLines={pingLines}
+                compact={view === "compact"}
                 onOpen={() => onOpen(n.id)}
               />
             ))}
@@ -423,6 +439,19 @@ function NodeList({
   )
 }
 
+const VIEW_KEY = "yydz-view"
+
+/** 上次选的视图，存在浏览器里；读不到存储或值不认识时用卡片 */
+function readView(): ViewMode {
+  try {
+    const v = localStorage.getItem(VIEW_KEY)
+    if (v === "card" || v === "compact" || v === "table") return v
+  } catch {
+    // 隐私模式等拿不到存储
+  }
+  return "card"
+}
+
 /**
  * 离线与在线节点分区分隔渲染网格
  */
@@ -430,11 +459,13 @@ function SeparateNodeGrids({
   nodes,
   showLatency,
   pingLines,
+  compact,
   onOpen,
 }: {
   nodes: Node[]
   showLatency: boolean
   pingLines: string
+  compact: boolean
   onOpen: (id: number) => void
 }) {
   const online = nodes.filter((n) => n.online)
@@ -451,6 +482,7 @@ function SeparateNodeGrids({
               node={n}
               showLatency={showLatency}
               pingLines={pingLines}
+              compact={compact}
               onOpen={() => onOpen(n.id)}
             />
           ))}
@@ -482,6 +514,7 @@ function SeparateNodeGrids({
                 node={n}
                 showLatency={showLatency}
                 pingLines={pingLines}
+                compact={compact}
                 onOpen={() => onOpen(n.id)}
               />
             ))}

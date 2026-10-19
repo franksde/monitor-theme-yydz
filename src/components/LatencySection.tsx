@@ -21,7 +21,7 @@ const SPARK_HEIGHT = 16
  * 微型延迟走势火花线组件 (Sparkline)
  * 高度仅 16px，支持真实超时断点切断绘制，不伪造连续连接
  */
-function LatencySparkline({
+export function LatencySparkline({
   points,
   grade,
 }: {
@@ -98,6 +98,26 @@ function LatencySparkline({
       ))}
     </svg>
   )
+}
+
+/** 延迟数值与丢包率的配色，卡片和列表视图共用 */
+export function latencyTone(ms: number | null, loss: number) {
+  const grade = evaluateLatency(ms, loss)
+  const msClass =
+    grade === "bad"
+      ? "text-destructive font-semibold"
+      : grade === "warn"
+        ? "text-warn font-medium"
+        : grade === "down"
+          ? "text-muted-foreground"
+          : "text-online font-medium"
+  const lossClass =
+    loss >= 5
+      ? "text-destructive font-semibold"
+      : loss > 0
+        ? "text-warn font-medium"
+        : "text-muted-foreground"
+  return { grade, msClass, lossClass }
 }
 
 /**
@@ -194,23 +214,7 @@ export function LatencySection({
         {rows.map((probe) => {
           const ms = probe.latestMs
           const loss = probe.loss
-          const grade = evaluateLatency(ms, loss)
-
-          const msClass =
-            grade === "bad"
-              ? "text-destructive font-semibold"
-              : grade === "warn"
-                ? "text-warn font-medium"
-                : grade === "down"
-                  ? "text-muted-foreground"
-                  : "text-online font-medium"
-
-          const lossClass =
-            loss >= 5
-              ? "text-destructive font-semibold"
-              : loss > 0
-                ? "text-warn font-medium"
-                : "text-muted-foreground"
+          const { grade, msClass, lossClass } = latencyTone(ms, loss)
 
           return (
             <div
