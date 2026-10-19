@@ -222,6 +222,7 @@ export default function App() {
               showLatency={config.show_latency !== false}
               pingLines={typeof config.ping_lines === "string" ? config.ping_lines : ""}
               offlinePlacement={typeof config.offline_placement === "string" ? config.offline_placement : "default"}
+              defaultView={isViewMode(config.default_view) ? config.default_view : "card"}
               onGroup={setGroup}
               onOpen={go}
             />
@@ -243,6 +244,7 @@ function NodeList({
   showLatency,
   pingLines,
   offlinePlacement = "default",
+  defaultView = "card",
   onGroup,
   onOpen,
 }: {
@@ -253,6 +255,7 @@ function NodeList({
   showLatency: boolean
   pingLines: string
   offlinePlacement?: string
+  defaultView?: ViewMode
   onGroup: (group: string | null) => void
   onOpen: (id: number) => void
 }) {
@@ -286,7 +289,7 @@ function NodeList({
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState<SortMode>("default")
   const [status, setStatus] = useState<FilterStatus>("all")
-  const [view, setView] = useState<ViewMode>(readView)
+  const [view, setView] = useState<ViewMode>(() => readView(defaultView))
   const changeView = (next: ViewMode) => {
     setView(next)
     try {
@@ -441,15 +444,19 @@ function NodeList({
 
 const VIEW_KEY = "yydz-view"
 
-/** 上次选的视图，存在浏览器里；读不到存储或值不认识时用卡片 */
-function readView(): ViewMode {
+function isViewMode(v: unknown): v is ViewMode {
+  return v === "card" || v === "compact" || v === "table"
+}
+
+/** 访客上次选的视图存在浏览器里；没选过、读不到存储或值不认识时用后台设的默认视图 */
+function readView(fallback: ViewMode): ViewMode {
   try {
     const v = localStorage.getItem(VIEW_KEY)
-    if (v === "card" || v === "compact" || v === "table") return v
+    if (isViewMode(v)) return v
   } catch {
     // 隐私模式等拿不到存储
   }
-  return "card"
+  return fallback
 }
 
 /**

@@ -54,6 +54,27 @@
         }
       ],
       "help": "控制离线与未接入服务器在首页节点卡片网格中的展示位置与呈现策略"
+    },
+    {
+      "key": "default_view",
+      "type": "select",
+      "label": "节点列表默认视图",
+      "default": "card",
+      "options": [
+        {
+          "label": "卡片",
+          "value": "card"
+        },
+        {
+          "label": "紧凑卡片",
+          "value": "compact"
+        },
+        {
+          "label": "列表（一行一台）",
+          "value": "table"
+        }
+      ],
+      "help": "访客第一次打开时用的视图；访客自己点过切换后，以他浏览器里记住的为准"
     }
   ]
 }
