@@ -8,6 +8,8 @@ import {
   formatArch,
   formatVirt,
   getCycleMonths,
+  parseRemarkCost,
+  remarkCosts,
 } from "./summary.ts"
 
 let failed = 0
@@ -109,6 +111,44 @@ eq(oddCosts.totalMonthly, 10, "未知货币不计入合计")
 eq(oddCosts.unconverted, ["XYZ"], "列出未折算的货币")
 eq(mixedCosts.breakdown.length, 2, "包含 CNY 和 USD 两个币种")
 eq(mixedCosts.breakdown.find((b) => b.currency === "USD")?.monthly, 5, "USD 月付为 5")
+
+// 2b. 私有备注里的费用（hub 的价格字段是公开的，费用改写在只有登录才返回的 remark 里）
+const cycleOf = (remark: string) => {
+  const cost = parseRemarkCost(remark)
+  return cost && cost !== "invalid" ? cost.billing_cycle : cost
+}
+eq(parseRemarkCost(undefined), null, "没有备注：未录入")
+eq(parseRemarkCost("日本软银线路\n年付续费"), null, "备注里没有费用行：未录入")
+eq(parseRemarkCost("费用: 25 USD/年"), { price: 25, currency: "USD", billing_cycle: "yearly" }, "标准格式")
+eq(
+  parseRemarkCost("软银线路\n  费用：12.5 gbp / 月  \n其它"),
+  { price: 12.5, currency: "GBP", billing_cycle: "monthly" },
+  "全角冒号、小写货币、斜杠两侧空格、混在其它行里",
+)
+eq(cycleOf("费用: 30 CNY/季"), "quarterly", "季")
+eq(cycleOf("费用: 30 CNY/半年"), "semiannual", "半年")
+eq(cycleOf("费用: 30 CNY/两年"), "biennial", "两年")
+eq(cycleOf("费用: 30 CNY/三年"), "triennial", "三年")
+eq(cycleOf("费用: 300 HKD/一次性"), "once", "一次性")
+eq(parseRemarkCost("费用: 25 USD/周"), "invalid", "不认识的周期")
+eq(parseRemarkCost("费用: 25美元/年"), "invalid", "货币不是三位代码")
+eq(parseRemarkCost("费用: USD 25/年"), "invalid", "金额和货币颠倒")
+eq(parseRemarkCost("费用: 25 USD/年\n费用: 3 USD/月"), "invalid", "两行费用无法确定用哪行")
+eq(parseRemarkCost("说明费用: 25 USD/年"), null, "费用不在行首不算费用行")
+
+const remarked = remarkCosts([
+  mockNode({ id: 1, remark: "费用: 10 CNY/月" }),
+  mockNode({ id: 2, remark: "软银\n费用: 12 USD/年" }), // 1 USD/月
+  mockNode({ id: 3, remark: "费用: 300 CNY/一次性" }),
+  mockNode({ id: 4, remark: "费用: 十块/月" }),
+  mockNode({ id: 5, remark: "冷备" }),
+  mockNode({ id: 6, price: 20, currency: "CNY", billing_cycle: "monthly" }), // 没写备注费用，回落到 price
+  mockNode({ id: 7, price: 99, currency: "CNY", billing_cycle: "monthly", remark: "费用: 5 CNY/月" }), // 备注优先
+])
+eq(remarked.costs.billableCount, 5, "备注费用 3 台 + price 回落 1 台 + 备注覆盖 price 1 台")
+eq(remarked.costs.totalMonthly, 42.1, "10 + 1 USD × 7.1 + 20 + 5")
+eq(remarked.costs.totalOnce, 300, "一次性 300")
+eq(remarked.invalid, 1, "1 台费用格式无法识别")
 
 // 3. 到期时间排行榜测试
 const emptyExpiry = calculateExpiryRank([])

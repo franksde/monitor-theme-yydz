@@ -71,6 +71,11 @@
     }
   }
 
+  // ?authed 预览登录后的样子：/api/me 返回已登录，价格改写进私有备注 remark（`费用: 25 USD/年`），
+  // 公开 price 置 0，和 hub 只在登录后返回 remark 的行为一致。60m 这种周期写不成备注，正好演示格式无法识别。
+  const AUTHED = new URLSearchParams(location.search).has("authed")
+  const ZH_CYCLE = { monthly: "月", quarterly: "季", semiannual: "半年", yearly: "年", biennial: "两年", triennial: "三年", once: "一次性" }
+
   // Seconds since the node last reported: an offline node stopped five hours ago.
   const OFFLINE_FOR = 5 * 3600
 
@@ -101,7 +106,8 @@
       // report, so 0 and null rather than a time.
       ...(state === "fresh" ? { last_seen: 0, last_seen_ago: null }
         : { last_seen: online ? now : now - OFFLINE_FOR, last_seen_ago: online ? 0 : OFFLINE_FOR }),
-      billing_cycle: cycle, currency, price,
+      billing_cycle: cycle, currency, price: AUTHED ? 0 : price,
+      ...(AUTHED ? { remark: `费用: ${price} ${currency}/${ZH_CYCLE[cycle] ?? cycle}` } : {}),
       expires_at: expires === null ? null : plusDays(expires), expires_in: expires,
       traffic_limit: 1024 * GiB, traffic_mode: "sum", traffic_reset_day: 1, month_start: today().slice(0, 8) + "01",
       month_rx: month, month_tx: month / 2, month_used: month * 1.5,
@@ -177,7 +183,7 @@
     const path = url.pathname
     if (method.toUpperCase() !== "GET") return text(403, "这是主题预览站，不能修改设置")
     if (path === "/api/me") {
-      return json({ authed: false, github: false, history_days: HISTORY_DAYS, public_page: true, site: url.origin, site_name: "主题预览" })
+      return json({ authed: AUTHED, github: false, history_days: HISTORY_DAYS, public_page: true, site: url.origin, site_name: "主题预览" })
     }
     if (path === "/api/nodes") return json(snapshot())
     if (path === "/api/ws") return text(426, "需要 WebSocket")

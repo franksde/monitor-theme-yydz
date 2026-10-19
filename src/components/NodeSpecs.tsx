@@ -28,6 +28,7 @@ import {
   osName,
 } from "@/lib/format"
 import { resolveNodeGeo } from "@/lib/geo"
+import { parseRemarkCost } from "@/lib/summary"
 
 export type NodeSpecsProps = {
   node: Node
@@ -35,6 +36,8 @@ export type NodeSpecsProps = {
 
 export function NodeSpecs({ node }: NodeSpecsProps) {
   const geo = resolveNodeGeo(node)
+  // 私有备注里的费用只在登录后随 remark 返回，有就以它为准
+  const fee = parseRemarkCost(node.remark)
 
   // 到期天数计算
   const daysLeft = node.expires_in !== undefined ? node.expires_in : daysUntil(node.expires_at)
@@ -187,9 +190,13 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
             <div className="flex items-center justify-between py-1.5">
               <span className="text-muted-foreground">资费周期</span>
               <span className="font-mono font-medium text-foreground">
-                {node.price > 0
-                  ? `${money(node.price, node.currency)} / ${cycle(node.billing_cycle)}`
-                  : "免费 / 赞助"}
+                {fee && fee !== "invalid" && fee.price > 0
+                  ? `${money(fee.price, fee.currency)} / ${cycle(fee.billing_cycle)}`
+                  : fee === "invalid"
+                    ? "备注里的费用格式无法识别"
+                    : node.price > 0
+                      ? `${money(node.price, node.currency)} / ${cycle(node.billing_cycle)}`
+                      : "免费 / 赞助"}
               </span>
             </div>
             <div className="flex items-center justify-between py-1.5">

@@ -102,6 +102,39 @@ export function calculateCosts(nodes: Node[]): CostSummary {
   }
 }
 
+const REMARK_CYCLES: Record<string, string> = {
+  月: "monthly", 季: "quarterly", 半年: "semiannual", 年: "yearly", 两年: "biennial", 三年: "triennial", 一次性: "once",
+}
+const COST_LINE = /^费用\s*[:：]/
+const COST = /^费用\s*[:：]\s*(\d+(?:\.\d+)?)\s+([A-Za-z]{3})\s*\/\s*(\S+)$/
+
+/**
+ * 私有备注里的费用行 `费用: 25 USD/年`。hub 的价格字段对匿名访客公开，私有备注只在登录后返回，
+ * 费用写在这里就只有登录的人看得到。没有费用行是 null，有但写错（或写了不止一行）是 "invalid"。
+ */
+export function parseRemarkCost(
+  remark: string | undefined,
+): Pick<Node, "price" | "currency" | "billing_cycle"> | "invalid" | null {
+  const lines = (remark ?? "").split("\n").map((l) => l.trim()).filter((l) => COST_LINE.test(l))
+  if (lines.length === 0) return null
+  if (lines.length > 1) return "invalid"
+  const m = COST.exec(lines[0])
+  const cycle = m && REMARK_CYCLES[m[3]]
+  if (!m || !cycle) return "invalid"
+  return { price: Number(m[1]), currency: m[2].toUpperCase(), billing_cycle: cycle }
+}
+
+/** 费用合计：备注里的费用优先，没写的节点用 hub 的价格字段；`invalid` 是备注费用写错的台数 */
+export function remarkCosts(nodes: Node[]): { costs: CostSummary; invalid: number } {
+  let invalid = 0
+  const priced = nodes.map((n) => {
+    const cost = parseRemarkCost(n.remark)
+    if (cost === "invalid") invalid++
+    return cost && cost !== "invalid" ? { ...n, ...cost } : n
+  })
+  return { costs: calculateCosts(priced), invalid }
+}
+
 /**
  * 到期排行项数据结构
  */

@@ -1,10 +1,10 @@
 {
-  "name": "一眼DZ",
-  "short": "yydz",
-  "description": "一眼鉴定为真",
-  "version": "1.0.5",
-  "author": "kiusnax",
-  "url": "https://github.com/kiusnax/monitor-theme-yydz",
+  "name": "一眼DZ Plus",
+  "short": "yydz-plus",
+  "description": "一眼DZ 的改版：卡片/宽松/列表三视图、默认深色、费用折算人民币，费用可写在私有备注里只给登录的人看",
+  "version": "1.0.5-fk.1",
+  "author": "franksde（原作 kiusnax）",
+  "url": "https://github.com/franksde/monitor-theme-yydz",
   "config": [
     {
       "key": "show_summary",

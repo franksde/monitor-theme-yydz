@@ -19,7 +19,7 @@ import { meterTone } from "@/components/Meter"
 import { Country } from "@/components/NodeCard"
 import { speedHistory, type Node } from "@/lib/api"
 import { bytes, money, rate } from "@/lib/format"
-import { calculateCosts, calculateExpiryRank, calculateNodeTypes } from "@/lib/summary"
+import { calculateExpiryRank, calculateNodeTypes, remarkCosts } from "@/lib/summary"
 import { cn } from "@/lib/utils"
 
 /**
@@ -111,16 +111,18 @@ function Spark({ series }: { series: { values: number[]; className: string }[] }
  * 整合：
  * 1. 实时监控态势（节点数、最高负载、今日流量、实时网速）
  * 2. 硬件资源与网络容量（CPU核数、内存总量、硬盘总量、节点带宽）
- * 3. 资产成本与服务周期（所有费用累计、到期时间排行榜）
+ * 3. 资产成本与服务周期（所有费用累计、到期时间排行榜）；费用只给登录的人看
  */
 export function Summary({
   nodes,
   group,
   onOpen,
+  authed = false,
 }: {
   nodes: Node[]
   group: string | null
   onOpen?: (id: number) => void
+  authed?: boolean
 }) {
   const online = nodes.filter((n) => n.online)
   const sum = (pick: (n: Node) => number) => nodes.reduce((total, n) => total + pick(n), 0)
@@ -158,7 +160,7 @@ export function Summary({
   const nodeTypes = calculateNodeTypes(nodes)
 
   // 3. 财务与服务周期计算
-  const costs = calculateCosts(nodes)
+  const { costs, invalid: invalidCosts } = remarkCosts(nodes)
   const expiry = calculateExpiryRank(nodes)
 
   return (
@@ -354,8 +356,8 @@ export function Summary({
 
       {/* 行 3：资产财务与服务周期排行榜 */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {/* 5. 所有费用累计（占 2 列） */}
-        <Tile
+        {/* 5. 所有费用累计（占 2 列，只给登录的人看） */}
+        {authed && <Tile
           icon={Coins}
           label="所有费用累计"
           className="lg:col-span-2"
@@ -410,13 +412,18 @@ export function Summary({
               </div>
             </div>
           )}
-        </Tile>
+          {invalidCosts > 0 && (
+            <div className="mt-1 text-[11px] text-warn">
+              {invalidCosts} 台费用格式无法识别（私有备注写一行「费用: 25 USD/年」）
+            </div>
+          )}
+        </Tile>}
 
         {/* 6. 到期时间排行榜（占 2 列） */}
         <Tile
           icon={CalendarClock}
           label="到期时间排行榜"
-          className="lg:col-span-2"
+          className={authed ? "lg:col-span-2" : "sm:col-span-2 lg:col-span-4"}
           badge={
             expiry.expiredCount > 0 ? (
               <span className="rounded-[1px] bg-destructive/15 px-1.5 py-0.5 text-[11px] font-medium text-destructive">

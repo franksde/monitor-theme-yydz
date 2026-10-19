@@ -218,6 +218,7 @@ export default function App() {
               defaultView={isViewMode(config.default_view) ? config.default_view : "compact"}
               onGroup={setGroup}
               onOpen={go}
+              authed={me.authed}
             />
           </div>
         )}
@@ -240,6 +241,7 @@ function NodeList({
   defaultView = "compact",
   onGroup,
   onOpen,
+  authed,
 }: {
   nodes: Node[]
   group: string | null
@@ -251,6 +253,7 @@ function NodeList({
   defaultView?: ViewMode
   onGroup: (group: string | null) => void
   onOpen: (id: number) => void
+  authed: boolean
 }) {
   const groups = groupsOf(nodes)
   const ungrouped = nodes.filter((n) => !n.group).length
@@ -362,7 +365,7 @@ function NodeList({
       )}
 
       {/* 全局与分组关键指标看板（包含硬件规格、网络带宽、费用累计与到期时间排行榜） */}
-      {summary && <Summary nodes={shown} group={current} onOpen={onOpen} />}
+      {summary && <Summary nodes={shown} group={current} onOpen={onOpen} authed={authed} />}
 
       {/* 地区过滤状态提示条 */}
       {selectedRegion && (
