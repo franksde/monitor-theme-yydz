@@ -59,15 +59,15 @@
       "key": "default_view",
       "type": "select",
       "label": "节点列表默认视图",
-      "default": "card",
+      "default": "compact",
       "options": [
         {
           "label": "卡片",
-          "value": "card"
+          "value": "compact"
         },
         {
-          "label": "紧凑卡片",
-          "value": "compact"
+          "label": "宽松卡片",
+          "value": "card"
         },
         {
           "label": "列表（一行一台）",

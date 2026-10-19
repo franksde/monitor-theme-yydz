@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react"
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { Moon, Sun, Wrench } from "lucide-react"
 
 import { Globe } from "@/components/Globe"
@@ -48,22 +48,15 @@ function useNodeRoute() {
   ] as const
 }
 
-const DARK_MEDIA = matchMedia("(prefers-color-scheme: dark)")
 
 /**
  * 深色/浅色主题管理 Hook
- * 监听系统偏好与 localStorage，在切换瞬间临时禁用全局过渡以防止颜色错位混杂
+ * 默认深色，不跟随系统；访客点过切换后以 localStorage 里记住的为准。
+ * 切换瞬间临时禁用全局过渡以防止颜色错位混杂
  */
 function useTheme() {
   const [saved, setSaved] = useState(() => localStorage.getItem("theme"))
-  const system = useSyncExternalStore(
-    (notify) => {
-      DARK_MEDIA.addEventListener("change", notify)
-      return () => DARK_MEDIA.removeEventListener("change", notify)
-    },
-    () => DARK_MEDIA.matches,
-  )
-  const dark = saved ? saved === "dark" : system
+  const dark = saved ? saved === "dark" : true
 
   useEffect(() => {
     // 切换模式时临时锁定过渡，防止渐变期间卡片背景与前景色产生闪白
@@ -222,7 +215,7 @@ export default function App() {
               showLatency={config.show_latency !== false}
               pingLines={typeof config.ping_lines === "string" ? config.ping_lines : ""}
               offlinePlacement={typeof config.offline_placement === "string" ? config.offline_placement : "default"}
-              defaultView={isViewMode(config.default_view) ? config.default_view : "card"}
+              defaultView={isViewMode(config.default_view) ? config.default_view : "compact"}
               onGroup={setGroup}
               onOpen={go}
             />
@@ -244,7 +237,7 @@ function NodeList({
   showLatency,
   pingLines,
   offlinePlacement = "default",
-  defaultView = "card",
+  defaultView = "compact",
   onGroup,
   onOpen,
 }: {

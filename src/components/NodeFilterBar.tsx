@@ -13,12 +13,15 @@ export type SortMode =
 
 export type FilterStatus = "all" | "online" | "offline"
 
-/** 节点列表的展示方式：卡片、紧凑卡片、一行一台的表格 */
+/**
+ * 节点列表的展示方式。值保持不变以兼容已存的选择，显示名：
+ * compact「卡片」（默认，指标细节与百分比同一行）、card「宽松」（细节单独一行）、table「列表」（一行一台）
+ */
 export type ViewMode = "card" | "compact" | "table"
 
 const VIEW_OPTIONS: { value: ViewMode; label: string; icon: typeof LayoutGrid }[] = [
-  { value: "card", label: "卡片", icon: LayoutGrid },
-  { value: "compact", label: "紧凑", icon: StretchHorizontal },
+  { value: "compact", label: "卡片", icon: LayoutGrid },
+  { value: "card", label: "宽松", icon: StretchHorizontal },
   { value: "table", label: "列表", icon: Rows3 },
 ]
 
@@ -158,7 +161,7 @@ export function NodeFilterBar({
 
       {/* 右侧：多维指标排序下拉（固定右对齐，暗色模式背景自适应） */}
       <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto sm:ml-auto">
-        {/* 视图切换：卡片 / 紧凑 / 列表 */}
+        {/* 视图切换：卡片 / 宽松 / 列表 */}
         <div role="group" aria-label="视图" className="mr-1.5 flex items-center gap-0.5 rounded-[2px] border border-border/60 bg-muted/30 p-0.5">
           {VIEW_OPTIONS.map(({ value, label, icon: Icon }) => (
             <button

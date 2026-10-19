@@ -370,27 +370,31 @@ export function Summary({
           }
         >
           {costs.billableCount > 0 ? (
-            <div className="mt-1.5 flex flex-col justify-between gap-2 sm:flex-row sm:items-baseline">
-              <div>
-                <div className="tnum text-xl font-bold tracking-tight text-foreground">
+            <div className="mt-1.5 flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
+              <div className="shrink-0">
+                <div className="tnum whitespace-nowrap text-xl font-bold tracking-tight text-foreground">
+                  {costs.breakdown.length > 1 && <span className="mr-0.5 text-sm font-normal text-muted-foreground">约</span>}
                   {money(costs.totalMonthly, costs.primaryCurrency)}{" "}
                   <span className="text-xs font-normal text-muted-foreground">/ 月</span>
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className="whitespace-nowrap text-xs text-muted-foreground">
                   折合 {money(costs.totalAnnual, costs.primaryCurrency)} / 年
                   {costs.totalOnce > 0 && ` · 买断 ${money(costs.totalOnce, costs.primaryCurrency)}`}
                 </div>
+                {costs.unconverted.length > 0 && (
+                  <div className="text-[11px] text-warn">{costs.unconverted.join("、")} 无汇率，未计入合计</div>
+                )}
               </div>
 
               {/* 多币种或明细展示 */}
               {costs.breakdown.length > 1 && (
-                <div className="flex flex-wrap items-center gap-1 pt-1 text-[11px] sm:pt-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-1 pt-1 text-[11px] sm:justify-end sm:pt-0">
                   {costs.breakdown.map((item) => (
                     <span
                       key={item.currency}
                       className="rounded-[1px] border border-border/60 bg-muted/30 px-1.5 py-0.5 font-mono text-muted-foreground"
                     >
-                      {item.currency}: {money(item.monthly, item.currency)}/月 ({item.count}台)
+                      {money(item.monthly, item.currency)}/月 · {item.count} 台
                     </span>
                   ))}
                 </div>

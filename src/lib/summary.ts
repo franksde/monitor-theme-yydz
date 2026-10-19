@@ -27,12 +27,24 @@ export function getCycleMonths(billing: string): number {
 /**
  * 费用明细数据结构
  */
+/**
+ * 折算人民币用的固定汇率（1 单位外币 ≈ 多少元，2026-10 取整）。只用于汇总看板的大概合计，
+ * 不追实时汇率：主题在访客浏览器里运行，不能为此去请求外部服务。
+ */
+export const CNY_RATES: Record<string, number> = {
+  CNY: 1, USD: 7.1, EUR: 7.7, GBP: 9.0, HKD: 0.91, JPY: 0.047, KRW: 0.0052, SGD: 5.3,
+  AUD: 4.6, CAD: 5.1, TWD: 0.22, CHF: 8.0, NZD: 4.2, RUB: 0.078, INR: 0.083,
+}
+
 export type CostSummary = {
+  /** 合计的币种，固定为 CNY */
   primaryCurrency: string
   totalMonthly: number
   totalAnnual: number
   totalOnce: number
   billableCount: number
+  /** 汇率表里没有、没计入合计的货币 */
+  unconverted: string[]
   breakdown: Array<{
     currency: string
     monthly: number
@@ -72,21 +84,20 @@ export function calculateCosts(nodes: Node[]): CostSummary {
     count: data.count,
   }))
 
-  // 按月付总额降序排列，主货币排第一
-  breakdown.sort((a, b) => b.monthly - a.monthly || b.count - a.count)
-  const primary = breakdown[0] ?? {
-    currency: "CNY",
-    monthly: 0,
-    once: 0,
-    count: 0,
-  }
+  // 各币种折成人民币再比大小、再合计；不能直接比原币数字（7500 韩元远少于 10 美元）
+  const cny = (amount: number, currency: string) => amount * (CNY_RATES[currency] ?? 0)
+  breakdown.sort((a, b) => cny(b.monthly, b.currency) - cny(a.monthly, a.currency) || b.count - a.count)
+  const unconverted = breakdown.filter((b) => !(b.currency in CNY_RATES)).map((b) => b.currency)
+  const totalMonthly = breakdown.reduce((sum, b) => sum + cny(b.monthly, b.currency), 0)
+  const totalOnce = breakdown.reduce((sum, b) => sum + cny(b.once, b.currency), 0)
 
   return {
-    primaryCurrency: primary.currency,
-    totalMonthly: primary.monthly,
-    totalAnnual: primary.monthly * 12,
-    totalOnce: primary.once,
+    primaryCurrency: "CNY",
+    totalMonthly,
+    totalAnnual: totalMonthly * 12,
+    totalOnce,
     billableCount,
+    unconverted,
     breakdown,
   }
 }

@@ -84,10 +84,29 @@ const mixedCosts = calculateCosts([
 ])
 
 eq(mixedCosts.billableCount, 5, "5 台计费节点")
-eq(mixedCosts.primaryCurrency, "CNY", "主货币为 CNY")
-eq(mixedCosts.totalMonthly, 30, "CNY 月付等效支出为 30")
-eq(mixedCosts.totalAnnual, 360, "CNY 年付等效支出为 360")
+// 合计一律折算成人民币：30 CNY + 5 USD × 7.1
+eq(mixedCosts.primaryCurrency, "CNY", "合计币种为 CNY")
+eq(mixedCosts.totalMonthly, 65.5, "折合人民币月付 65.5")
+eq(mixedCosts.totalAnnual, 786, "折合人民币年付 786")
 eq(mixedCosts.totalOnce, 200, "CNY 一次性支出为 200")
+eq(mixedCosts.unconverted, [], "两种货币都能折算")
+
+// 小币值货币数字再大也不能当标题：7500 KRW/月 远少于 10 USD/月
+const krwCosts = calculateCosts([
+  mockNode({ id: 1, price: 22500, currency: "KRW", billing_cycle: "quarterly" }), // 7500 KRW/月
+  mockNode({ id: 2, price: 10, currency: "usd", billing_cycle: "monthly" }), // 小写货币代码
+])
+eq(krwCosts.primaryCurrency, "CNY", "多币种合计仍为 CNY")
+eq(Math.round(krwCosts.totalMonthly * 100) / 100, 110, "7500 KRW × 0.0052 + 10 USD × 7.1 = 110")
+eq(krwCosts.breakdown[0].currency, "USD", "明细按折合人民币金额降序，USD 在 KRW 前")
+
+// 汇率表里没有的货币不计入合计，单独列出
+const oddCosts = calculateCosts([
+  mockNode({ id: 1, price: 10, currency: "CNY", billing_cycle: "monthly" }),
+  mockNode({ id: 2, price: 99, currency: "XYZ", billing_cycle: "monthly" }),
+])
+eq(oddCosts.totalMonthly, 10, "未知货币不计入合计")
+eq(oddCosts.unconverted, ["XYZ"], "列出未折算的货币")
 eq(mixedCosts.breakdown.length, 2, "包含 CNY 和 USD 两个币种")
 eq(mixedCosts.breakdown.find((b) => b.currency === "USD")?.monthly, 5, "USD 月付为 5")
 
