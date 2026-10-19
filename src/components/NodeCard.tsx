@@ -12,6 +12,7 @@ import { LatencySection } from "@/components/LatencySection"
 import type { Node } from "@/lib/api"
 import { bytes, daysUntil, FOREVER, osName, pair, percent, rate, sinceSeen, uptime } from "@/lib/format"
 import { cn } from "@/lib/utils"
+import { monthUsage } from "@/lib/telemetry"
 
 import { FLAGS } from "@/lib/flags"
 
@@ -24,25 +25,6 @@ const DISTROS: [string, SimpleIcon][] = [
   ["centos", siCentos], ["rocky", siRockylinux], ["almalinux", siAlmalinux], ["red hat", siRedhat],
   ["fedora", siFedora], ["arch", siArchlinux], ["opensuse", siOpensuse],
 ]
-
-/**
- * This period's usage as the plan meters it. The hub computes it; the switch
- * below serves only a hub from before `month_used`.
- */
-function monthUsage(node: Node): number {
-  if (typeof node.month_used === "number") return node.month_used
-  const { month_rx: rx, month_tx: tx } = node
-  switch (node.traffic_mode) {
-    case "up":
-      return tx
-    case "down":
-      return rx
-    case "max":
-      return Math.max(rx, tx)
-    default:
-      return rx + tx
-  }
-}
 
 // A node that has reported once has told the hub its shape -- cores, memory,
 // disk -- and the hub retains its traffic totals whether connected or not. A node

@@ -1,4 +1,5 @@
 import type { Node } from "./api.ts"
+import { observedSeconds } from "./telemetry.ts"
 import { daysUntil } from "./format.ts"
 
 /**
@@ -73,7 +74,12 @@ export function calculateCosts(nodes: Node[]): CostSummary {
 
   // 按月付总额降序排列，主货币排第一
   breakdown.sort((a, b) => b.monthly - a.monthly || b.count - a.count)
-  const primary = breakdown[0] ?? { currency: "CNY", monthly: 0, once: 0, count: 0 }
+  const primary = breakdown[0] ?? {
+    currency: "CNY",
+    monthly: 0,
+    once: 0,
+    count: 0,
+  }
 
   return {
     primaryCurrency: primary.currency,
@@ -196,12 +202,7 @@ export function calculateNodeTypes(nodes: Node[]): NodeTypesSummary {
 }
 
 export type SortMode =
-  | "default"
-  | "cpu_desc"
-  | "mem_desc"
-  | "net_desc"
-  | "expires_asc"
-  | "traffic_desc"
+  "default" | "cpu_desc" | "mem_desc" | "net_desc" | "expires_asc" | "traffic_desc"
 
 export type FilterStatus = "all" | "online" | "offline"
 
@@ -326,85 +327,60 @@ export type UptimeSlaSummary = {
 }
 
 /**
- * 计算历史窗口期内的真实在线率 SLA 与分段心跳健康度
- * 解决节点离线时后端不返回采样点（时间序列存在断档/Gap）导致虚假 100% SLA 的核心缺陷。
+ * 估算遥测覆盖率：按桶与分段的交集分配在线分钟，共享分母并去重。
+ * 小时聚合仅保存覆盖分钟总量，无法恢复桶内准确的失联时刻，因此分段为均匀分配估算。
  */
 export function calculateUptimeSla(
   metrics: Array<{ ts: number; minutes?: number }>,
   step = 60,
   hours = 24,
   segmentCount = 48,
+  nowTs = Math.floor(Date.now() / 1000),
 ): UptimeSlaSummary {
-  if (!metrics || metrics.length === 0 || !hours || hours <= 0) {
-    return { slaPct: 100, totalMinutes: 0, expectedMinutes: 0, segments: [] }
+  if (
+    !Number.isFinite(hours) ||
+    hours <= 0 ||
+    !Number.isFinite(step) ||
+    step <= 0 ||
+    !Number.isInteger(segmentCount) ||
+    segmentCount <= 0
+  ) {
+    return { slaPct: 0, totalMinutes: 0, expectedMinutes: 0, segments: [] }
   }
-
-  const latestTs = metrics[metrics.length - 1].ts
-  const firstTs = metrics[0].ts
-  const requestedSpan = hours * 3600
-  const actualSpan = Math.max(0, latestTs - firstTs)
-
-  // 若历史采样跨度达到请求窗口的 75% 以上，使用标准请求窗口，否则按实际跨度
-  const effectiveSpan = actualSpan >= requestedSpan * 0.75 ? requestedSpan : Math.max(actualSpan, step)
-  const windowEnd = latestTs
-  const windowStart = windowEnd - effectiveSpan
-  const expectedTotalMinutes = Math.max(1, Math.round(effectiveSpan / 60))
-
-  // 统计窗口内真实在线分钟数（累加落在窗口内的采样点）
-  let totalOnlineMinutes = 0
-  for (const p of metrics) {
-    if (p.ts >= windowStart - step * 0.5 && p.ts <= windowEnd + step * 0.5) {
-      const m = typeof p.minutes === "number" ? p.minutes : Math.max(1, Math.round(step / 60))
-      totalOnlineMinutes += m
+  const start = nowTs - hours * 3600
+  const rows = [
+    ...new Map(metrics.filter((p) => Number.isFinite(p.ts)).map((p) => [p.ts, p])).values(),
+  ].sort((a, b) => a.ts - b.ts)
+  const duration = (hours * 3600) / segmentCount
+  const segments: UptimeSlaSegment[] = Array.from({ length: segmentCount }, (_, i) => {
+    const from = start + i * duration
+    const to = from + duration
+    let minutes = 0
+    for (let j = 0; j < rows.length; j++) {
+      const p = rows[j]
+      // 重叠桶截断到下一桶起点，避免异常返回导致同一时间重复计时。
+      const bucketEnd = Math.min(p.ts + step, rows[j + 1]?.ts ?? Infinity)
+      minutes += observedSeconds(p, step, from, Math.min(to, bucketEnd, nowTs), nowTs) / 60
     }
-  }
-
-  // 防止统计微量超出期望值
-  totalOnlineMinutes = Math.min(expectedTotalMinutes, totalOnlineMinutes)
-  const slaPct = (totalOnlineMinutes / expectedTotalMinutes) * 100
-
-  const segDuration = effectiveSpan / segmentCount
-  const expectedPerSeg = segDuration / 60
-
-  const segments: UptimeSlaSegment[] = []
-  for (let i = 0; i < segmentCount; i++) {
-    const sStart = windowStart + i * segDuration
-    const sEnd = sStart + segDuration
-
-    // 查找落在此时间段内的采样点
-    const pts = metrics.filter((p) => p.ts >= sStart - step * 0.1 && p.ts < sEnd - step * 0.1)
-    const segOnline = pts.reduce((sum, p) => {
-      const m = typeof p.minutes === "number" ? p.minutes : Math.max(1, Math.round(step / 60))
-      return sum + m
-    }, 0)
-
-    const effectiveOnline = Math.min(expectedPerSeg, segOnline)
-    const pct = expectedPerSeg > 0 ? (effectiveOnline / expectedPerSeg) * 100 : 0
-
-    let status: "up" | "degraded" | "down" = "up"
-    if (effectiveOnline <= 0.05) {
-      status = "down"
-    } else if (effectiveOnline < expectedPerSeg * 0.85) {
-      status = "degraded"
-    } else {
-      status = "up"
+    const expected = duration / 60
+    minutes = Math.min(expected, minutes)
+    const pct = (minutes / expected) * 100
+    return {
+      ts: from,
+      startTs: from,
+      endTs: to,
+      minutes,
+      expected,
+      pct,
+      status: pct === 0 ? "down" : pct < 85 ? "degraded" : "up",
     }
-
-    segments.push({
-      ts: Math.round(sStart),
-      startTs: Math.round(sStart),
-      endTs: Math.round(sEnd),
-      minutes: Number(effectiveOnline.toFixed(1)),
-      expected: Number(expectedPerSeg.toFixed(1)),
-      status,
-      pct: Number(pct.toFixed(1)),
-    })
-  }
-
+  })
+  const totalMinutes = segments.reduce((sum, seg) => sum + seg.minutes, 0)
+  const expectedMinutes = hours * 60
   return {
-    slaPct: Math.min(100, Math.max(0, Number(slaPct.toFixed(2)))),
-    totalMinutes: totalOnlineMinutes,
-    expectedMinutes: expectedTotalMinutes,
+    slaPct: Number(((totalMinutes / expectedMinutes) * 100).toFixed(2)),
+    totalMinutes,
+    expectedMinutes,
     segments,
   }
 }

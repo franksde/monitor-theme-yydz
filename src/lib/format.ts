@@ -276,13 +276,15 @@ export function quarters(top: number): number[] {
  * spacing is the median gap rather than the hub's bucket: an agent reporting
  * every few minutes leaves a row only every few buckets.
  */
-export function withGaps<T extends { ts: number }>(rows: T[]): (T | { ts: number })[] {
+export function withGaps<T extends { ts: number }>(rows: T[], expectedInterval?: number): (T | { ts: number })[] {
   const gaps = rows.slice(1).map((r, i) => r.ts - rows[i].ts).sort((a, b) => a - b)
   // The lower median: of two gaps, the shorter is the spacing and the longer
   // the one in question.
-  const usual = gaps[(gaps.length - 1) >> 1]
+  const usual = expectedInterval ?? gaps[(gaps.length - 1) >> 1]
+  // 已知接口桶宽时，一个缺失桶也必须断线；无桶宽时沿用中位间距推断。
+  const tolerance = expectedInterval ? 1.5 : 2
   return rows.flatMap((r, i) =>
-    i > 0 && r.ts - rows[i - 1].ts > 2 * usual ? [{ ts: (r.ts + rows[i - 1].ts) / 2 }, r] : [r],
+    i > 0 && r.ts - rows[i - 1].ts > tolerance * usual ? [{ ts: (r.ts + rows[i - 1].ts) / 2 }, r] : [r],
   )
 }
 

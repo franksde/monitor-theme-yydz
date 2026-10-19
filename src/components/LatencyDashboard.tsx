@@ -1,20 +1,12 @@
-/**
- * 网络延迟多维测控驾驶舱组件 (Latency Dashboard & Route Analysis)
- * 具备：
- * 1. 探测线路指标卡片网格（含实时延迟、质量评级、丢包率、极值抖动、SVG 微型火花线趋势）
- * 2. 多视图自由切换（聚合多线对比 / 分轨独立矩阵 / 路由阶梯排行）
- * 3. 彻底修复底部时间滑块（Brush）在黑暗模式下的高亮大白块问题（自适应暗灰半透明工控滑块）
- * 4. 线路单选聚焦 (Solo)、隐藏/显示筛选、削峰 (Despike) 平滑滤波
- * 遵循 AGENT.md 规范：采用微倒角 (2px)、全中文注释、工业仪器极简美学、零多余外部依赖。
- */
-
-import { useMemo, useState } from "react"
+import { CHART_ACTIVE_DOT, CHART_TOOLTIP } from "@/components/ui/chart-theme"
+import { memo, useMemo, useState } from "react"
 import {
   Area,
   Bar,
   BarChart,
   Brush,
   CartesianGrid,
+  Cell,
   ComposedChart,
   Line,
   ResponsiveContainer,
@@ -22,637 +14,583 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
-import {
-  BarChart2,
-  Grid,
-  TrendingUp,
-  Wifi,
-} from "lucide-react"
-
-import { Badge } from "@/components/ui/badge"
 import { clockFor, despike, tickClock, timeTicks } from "@/lib/format"
+import type { PingPoint } from "@/lib/latency"
 import { cn } from "@/lib/utils"
 
-export type PingSample = {
-  task_id: number
-  ts: number
-  latency: number | null
-  band?: [number, number]
-  loss?: number
-}
-
-export type ProbeSeries = {
-  id: number
-  name: string
-  points: PingSample[]
-  loss: number
-}
-
+export type PingSample = PingPoint
+export type ProbeSeries = { id: number; name: string; points: PingSample[]; loss: number | null }
 export type LatencyDashboardProps = {
   pingSeries: ProbeSeries[]
   hours: number
+  nowTs: number
+  step?: number
   smooth: boolean
   onToggleSmooth: (smooth: boolean) => void
 }
-
-type ViewMode = "combined" | "split" | "ranking"
-
-const AXIS = { stroke: "currentColor", fontSize: 12, tickLine: false, axisLine: false }
-const SERIES = { dot: false as const, strokeWidth: 1.5, isAnimationActive: false }
-
-// 工控高对比度调色盘（多线路各具辨识度，同时兼具深浅色模式表现力）
+type ViewMode = "combined" | "split" | "ranking" | "loss"
+const AXIS = { stroke: "currentColor", fontSize: 11, tickLine: false, axisLine: false }
 const PALETTE = [
-  { stroke: "oklch(0.68 0.19 145)", dash: undefined, label: "翠绿" },
-  { stroke: "oklch(0.65 0.18 240)", dash: "5 3", label: "天蓝" },
-  { stroke: "oklch(0.72 0.16 75)", dash: "2 2", label: "琥珀" },
-  { stroke: "oklch(0.68 0.22 310)", dash: "8 3 2 3", label: "紫罗兰" },
-  { stroke: "oklch(0.65 0.22 25)", dash: "4 2", label: "玫瑰" },
-  { stroke: "oklch(0.62 0.15 195)", dash: "1 3", label: "青碧" },
+  "var(--color-primary)",
+  "var(--color-chart-2)",
+  "var(--color-chart-4)",
+  "var(--color-online)",
+  "var(--color-warn)",
+  "var(--color-chart-5)",
 ]
+const color = (id: number) => PALETTE[((id % PALETTE.length) + PALETTE.length) % PALETTE.length]
+const ms = (value: number | null) => (value === null ? "—" : `${value.toFixed(1)} ms`)
 
-const TOOLTIP_STYLE = {
-  isAnimationActive: false,
-  labelFormatter: (ts: unknown) => new Date(Number(ts)).toLocaleString("zh-CN"),
-  contentStyle: {
-    fontSize: 12,
-    borderRadius: 2,
-    border: "1px solid var(--color-border)",
-    background: "var(--color-card)",
-    color: "var(--color-foreground)",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-  },
+/** 在超时与采集断档处分别滤波，避免跨越故障边界计算平滑值。 */
+function smoothSegments(points: PingSample[], step: number) {
+  const result: (number | null)[] = points.map(() => null)
+  let from = 0
+  while (from < points.length) {
+    if (points[from].latency === null) {
+      from++
+      continue
+    }
+    let to = from + 1
+    while (
+      to < points.length &&
+      points[to].latency !== null &&
+      points[to].ts - points[to - 1].ts <= step * 1.5
+    )
+      to++
+    const values = despike(points.slice(from, to).map((p) => p.latency))
+    values.forEach((value, i) => {
+      result[from + i] = value
+    })
+    from = to
+  }
+  return result
 }
 
-function despikeWindow(points: { ts: number }[]): number {
-  let step = Infinity
-  for (let i = 1; i < points.length; i++) step = Math.min(step, points[i].ts - points[i - 1].ts)
-  return Math.min(15, Math.max(3, Math.round(420 / step) | 1))
+/** 小火花线以真实时间定位，超时和采集断档保留断点。 */
+function Sparkline({
+  points,
+  step,
+  stroke,
+}: {
+  points: PingSample[]
+  step: number
+  stroke: string
+}) {
+  const valid = points.filter((p) => p.latency !== null)
+  if (valid.length < 2) return <span className="h-6 w-20" />
+  const maximum = Math.max(1, ...valid.map((p) => p.latency ?? 0))
+  const start = points[0].ts
+  const span = Math.max(1, points[points.length - 1].ts - start)
+  const paths: string[] = []
+  let path = ""
+  points.forEach((point, i) => {
+    if (point.latency === null) {
+      if (path) paths.push(path)
+      path = ""
+      return
+    }
+    if (i > 0 && point.ts - points[i - 1].ts > step * 1.5) {
+      if (path) paths.push(path)
+      path = ""
+    }
+    path += `${path ? "L" : "M"}${(((point.ts - start) / span) * 80).toFixed(1)},${(22 - (point.latency / maximum) * 20).toFixed(1)} `
+  })
+  if (path) paths.push(path)
+  return (
+    <svg viewBox="0 0 80 24" className="h-6 w-20 shrink-0" aria-hidden="true">
+      {paths.map((d, i) => (
+        <path key={i} d={d} stroke={stroke} fill="none" strokeWidth="1.5" />
+      ))}
+    </svg>
+  )
 }
 
-function getProbeStyle(id: number, series: ProbeSeries[]) {
-  const idx = series.findIndex((p) => p.id === id)
-  return PALETTE[idx >= 0 ? idx % PALETTE.length : 0]
-}
-
-export function LatencyDashboard({
+export const LatencyDashboard = memo(function LatencyDashboard({
   pingSeries,
   hours,
+  nowTs,
+  step = 60,
   smooth,
   onToggleSmooth,
 }: LatencyDashboardProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>("combined")
-  const [hiddenProbes, setHiddenProbes] = useState<number[]>([])
-  const [zoom, setZoom] = useState<[number, number] | null>(null)
-
-  // 1. 各探测线路样式映射（稳定绑定）
-  const getStyle = (id: number) => getProbeStyle(id, pingSeries)
-
-  // 2. 探测线路综合指标分析（最新、均值、最低、最高、抖动与质量等级，处理空数据状态）
-  const probeSummaries = useMemo(() => {
-    return pingSeries.map((s) => {
-      const validPoints = s.points.filter((p) => p.latency !== null && p.latency !== undefined)
-      const values = validPoints.map((p) => p.latency as number)
-
-      const latest = validPoints.length > 0 ? validPoints[validPoints.length - 1].latency : null
-      const min = values.length > 0 ? Math.min(...values) : null
-      const max = values.length > 0 ? Math.max(...values) : null
-      const sum = values.reduce((acc, v) => acc + v, 0)
-      const avg = values.length > 0 ? sum / values.length : null
-
-      // 计算网络抖动（相邻采样点差值的绝对值均值）
-      let diffSum = 0
-      for (let i = 1; i < values.length; i++) {
-        diffSum += Math.abs(values[i] - values[i - 1])
-      }
-      const jitter = values.length > 1 ? diffSum / (values.length - 1) : null
-
-      // 线路质量等级评级
-      let tier = {
-        label: "极佳",
-        colorClass: "text-emerald-500",
-      }
-      if (avg === null) {
-        tier = { label: "暂无数据", colorClass: "text-muted-foreground" }
-      } else if (avg >= 200 || s.loss >= 15) {
-        tier = { label: "较差", colorClass: "text-rose-500" }
-      } else if (avg >= 100 || s.loss >= 5) {
-        tier = { label: "一般", colorClass: "text-amber-500" }
-      } else if (avg >= 50) {
-        tier = { label: "优良", colorClass: "text-sky-500" }
-      }
-
-      // 生成用于微型火花线 Sparkline 的数据采样
-      const sparkSampleCount = 30
-      const sparkStep = Math.max(1, Math.floor(validPoints.length / sparkSampleCount))
-      const sparklineData = validPoints
-        .filter((_, i) => i % sparkStep === 0)
-        .slice(-sparkSampleCount)
-        .map((p) => p.latency as number)
-
-      return {
-        ...s,
-        latest,
-        min,
-        max,
-        avg,
-        jitter,
-        tier,
-        sparklineData,
-        style: getProbeStyle(s.id, pingSeries),
-      }
-    })
-  }, [pingSeries])
-
-  // 实际数据时间跨度计算
-  const latencyDataSpan = useMemo(() => {
-    const allSamples = pingSeries.flatMap((s) => s.points)
-    if (allSamples.length === 0) return ""
-    const minTs = allSamples.reduce((min, p) => Math.min(min, p.ts * 1000), Infinity)
-    const maxTs = allSamples.reduce((max, p) => Math.max(max, p.ts * 1000), 0)
-    const actualHours = Math.max(0.1, (maxTs - minTs) / (3600 * 1000))
-    const windowLabel = hours < 24 ? `${hours} 小时` : `${Math.round(hours / 24)} 天`
-
-    if (actualHours < hours * 0.75) {
-      const actualLabel =
-        actualHours < 1
-          ? `${Math.max(1, Math.round(actualHours * 60))} 分钟`
-          : actualHours < 24
-            ? `${actualHours.toFixed(1)} 小时`
-            : `${(actualHours / 24).toFixed(1)} 天`
-      return `窗口 ${windowLabel}（实际跨度约 ${actualLabel}）`
+  const [view, setView] = useState<ViewMode>("combined")
+  const [hidden, setHidden] = useState<number[]>([])
+  const [zoom, setZoom] = useState<{ hours: number; from: number; to: number } | null>(null)
+  const start = nowTs - hours * 3600
+  const summaries = useMemo(
+    () =>
+      pingSeries.map((series) => {
+        const values = series.points
+          .filter((p) => p.latency !== null && Number.isFinite(p.latency) && p.latency >= 0)
+          .map((p) => p.latency as number)
+        const last = series.points[series.points.length - 1]
+        const stale = !!last && nowTs - last.ts > Math.max(step * 1.5, 120)
+        const down = !!last && last.latency === null
+        // 抖动只统计时间相邻的两个成功桶，不跨超时和缺测窗口。
+        let differences = 0
+        let pairs = 0
+        series.points.forEach((point, i) => {
+          const previous = series.points[i - 1]
+          if (
+            previous &&
+            previous.latency !== null &&
+            point.latency !== null &&
+            point.ts - previous.ts <= step * 1.5
+          ) {
+            differences += Math.abs(point.latency - previous.latency)
+            pairs++
+          }
+        })
+        const avg = values.length ? values.reduce((sum, n) => sum + n, 0) / values.length : null
+        const min = values.length
+          ? Math.min(
+              ...series.points
+                .filter((p) => p.latency !== null)
+                .map((p) => p.band?.[0] ?? p.latency!),
+            )
+          : null
+        const max = values.length
+          ? Math.max(...series.points.map((p) => p.band?.[1] ?? p.latency ?? 0))
+          : null
+        const loss = series.loss
+        const quality = !last
+          ? "暂无采样"
+          : stale
+            ? "近期无新采样"
+            : down
+              ? "最近探测失败"
+              : avg === null
+                ? "暂无有效探测"
+                : loss === null
+                  ? "失败率未知"
+                  : loss > 0
+                    ? "窗口内存在探测失败"
+                    : "窗口内探测均成功"
+        return {
+          ...series,
+          stale,
+          down,
+          avg,
+          min,
+          max,
+          jitter: pairs ? differences / pairs : null,
+          successBuckets: values.length,
+          latest: last?.latency ?? null,
+          quality,
+        }
+      }),
+    [pingSeries, step, nowTs],
+  )
+  const shown = summaries.filter((series) => !hidden.includes(series.id))
+  const ranking = [...shown]
+    .filter((series) => series.avg !== null)
+    .sort((a, b) => (a.avg ?? 0) - (b.avg ?? 0))
+  const rows = useMemo(() => {
+    const result = new Map<number, Record<string, number | [number, number] | null>>()
+    const rowAt = (ts: number) => {
+      if (!result.has(ts)) result.set(ts, { ts: ts * 1000 })
+      return result.get(ts)!
     }
-    return `涵盖最近 ${windowLabel}`
-  }, [pingSeries, hours])
-
-  // 3. 构建多线路时间对齐行（用于聚合图表）
-  const pingRows = useMemo(() => {
-    const rows = new Map<
-      number,
-      { ts: number } & Record<string, number | [number, number] | null>
-    >()
-
-    for (const s of pingSeries) {
-      const windowSize = despikeWindow(s.points)
-      const smoothed = despike(s.points.map((p) => p.latency), windowSize)
-      const lo = despike(s.points.map((p) => p.band?.[0] ?? p.latency), windowSize)
-      const hi = despike(s.points.map((p) => p.band?.[1] ?? p.latency), windowSize)
-
-      s.points.forEach((p, i) => {
-        const row = rows.get(p.ts) ?? { ts: p.ts * 1_000 }
-        row[`t${s.id}`] = p.latency
-        row[`s${s.id}`] = smoothed[i]
-        row[`l${s.id}`] = p.loss ?? 0
-        row[`b${s.id}`] = p.band ?? (p.latency === null ? null : [p.latency, p.latency])
-
-        const [low, high] = [lo[i], hi[i]]
-        row[`c${s.id}`] =
-          low === null || high === null
-            ? null
-            : [Math.min(low, high, smoothed[i] ?? low), Math.max(low, high, smoothed[i] ?? high)]
-        rows.set(p.ts, row)
+    for (const series of pingSeries) {
+      const filtered = smoothSegments(series.points, step)
+      series.points.forEach((point, i) => {
+        const row = rowAt(point.ts)
+        row[`loss${series.id}`] = point.loss ?? (point.latency === null ? 100 : 0)
+        row[`raw${series.id}`] = point.latency
+        row[`smooth${series.id}`] = filtered[i]
+        row[`band${series.id}`] =
+          point.latency === null ? null : (point.band ?? [point.latency, point.latency])
+        const previous = series.points[i - 1]
+        if (previous && point.ts - previous.ts > step * 1.5)
+          rowAt((previous.ts + point.ts) / 2)[`raw${series.id}`] = null
       })
     }
-    return [...rows.values()].sort((a, b) => a.ts - b.ts)
-  }, [pingSeries])
-
-  // 4. 当前处于激活展示状态的探测线路
-  const shownProbes = useMemo(
-    () => pingSeries.filter((s) => !hiddenProbes.includes(s.id)),
-    [pingSeries, hiddenProbes]
+    return [...result.values()].sort((a, b) => Number(a.ts) - Number(b.ts))
+  }, [pingSeries, step])
+  // 时间缩放跨视图共享；窗口改变后忽略旧索引，刷新沿用绝对时间区间。
+  const activeZoom = zoom?.hours === hours && zoom.to > start && zoom.from < nowTs ? zoom : null
+  const from = activeZoom ? Math.max(start, activeZoom.from) : start
+  const to = activeZoom ? Math.min(nowTs, activeZoom.to) : nowTs
+  const plottedRows = rows.filter(
+    (row) => Number(row.ts) >= from * 1000 && Number(row.ts) <= to * 1000,
+  )
+  const ticks = timeTicks(from * 1000, to * 1000)
+  const timeAxis = {
+    ...AXIS,
+    dataKey: "ts",
+    type: "number" as const,
+    domain: [from * 1000, to * 1000],
+    ticks,
+    tickFormatter: tickClock(ticks, hours),
+    minTickGap: 45,
+  }
+  const solo = (id: number) =>
+    setHidden(
+      shown.length === 1 && shown[0].id === id
+        ? []
+        : summaries.filter((series) => series.id !== id).map((series) => series.id),
+    )
+  const noSelection = (
+    <div className="flex min-h-40 items-center justify-center text-xs text-muted-foreground">
+      没有选定线路，请点击上方“显示全部”或线路名称。
+    </div>
   )
 
-  // 5. 排序排行图表数据（按平均延迟由快到慢排序，过滤无有效采样）
-  const rankingData = useMemo(() => {
-    return [...probeSummaries]
-      .filter((s) => s.avg !== null)
-      .sort((a, b) => (a.avg ?? 0) - (b.avg ?? 0))
-      .map((s) => ({
-        name: s.name,
-        avg: Math.round(s.avg ?? 0),
-        min: Math.round(s.min ?? 0),
-        max: Math.round(s.max ?? 0),
-        jitter: Math.round(s.jitter ?? 0),
-        loss: s.loss,
-      }))
-  }, [probeSummaries])
-
-  // 时间轴生成器（根据请求窗口与缩放区间对齐时间轴，真实呈现数据实际起止与空缺分布）
-  const timeAxis = (rows: { ts: number }[], from = 0, to = rows.length - 1) => {
-    const isZoomed = zoom !== null
-    const now = rows.length > 0 ? rows[rows.length - 1].ts : Date.now()
-    const windowStart = now - hours * 3600 * 1000
-    const windowEnd = now
-
-    const domainStart = isZoomed ? (rows[from]?.ts ?? windowStart) : windowStart
-    const domainEnd = isZoomed ? (rows[to]?.ts ?? windowEnd) : windowEnd
-    const ticks = timeTicks(domainStart, domainEnd)
-
-    return {
-      dataKey: "ts",
-      type: "number" as const,
-      domain: [domainStart, domainEnd] as [number, number],
-      ticks,
-      tickFormatter: tickClock(ticks, hours),
-      minTickGap: hours > 24 ? 72 : 40,
-      ...AXIS,
-    }
-  }
-
-  // 独占聚焦单条线路 (Solo)
-  const handleSolo = (id: number) => {
-    if (hiddenProbes.length === pingSeries.length - 1 && !hiddenProbes.includes(id)) {
-      // 已经处于该单线 Solo 状态，点击恢复全部显示
-      setHiddenProbes([])
-    } else {
-      // 将除该 id 外的所有其他线路隐藏
-      setHiddenProbes(pingSeries.filter((s) => s.id !== id).map((s) => s.id))
-    }
-  }
+  /** 三种视图共用一套原始数据、线路选择及时间边界。 */
+  const chart = (series: typeof shown, height: string) => (
+    <div
+      key={`${series.map((item) => item.id).join(",")}-${smooth}-${from}-${to}`}
+      className={cn(height, "animate-fade-in text-muted-foreground")}
+    >
+      <ResponsiveContainer>
+        <ComposedChart data={plottedRows}>
+          <CartesianGrid stroke="var(--color-border)" vertical={false} strokeDasharray="3 3" />
+          <XAxis {...timeAxis} />
+          <YAxis {...AXIS} unit="ms" width={58} domain={[0, "auto"]} />
+          <Tooltip
+            {...CHART_TOOLTIP}
+            labelFormatter={(v) => new Date(Number(v)).toLocaleString("zh-CN")}
+            formatter={(v, name) => [ms(Number(v)), name]}
+          />
+          {!smooth && series.length === 1 && (
+            <Area
+              activeDot={CHART_ACTIVE_DOT}
+              dataKey={`band${series[0].id}`}
+              stroke="none"
+              fill={color(series[0].id)}
+              fillOpacity={0.12}
+              connectNulls={false}
+              tooltipType="none"
+              isAnimationActive={false}
+            />
+          )}
+          {series.map((item) => (
+            <Line
+              activeDot={CHART_ACTIVE_DOT}
+              key={item.id}
+              dataKey={`${smooth ? "smooth" : "raw"}${item.id}`}
+              name={item.name}
+              stroke={color(item.id)}
+              strokeDasharray={item.id % 2 ? undefined : "4 2"}
+              strokeWidth={1.5}
+              dot={
+                plottedRows.length < 60
+                  ? { r: 2, fill: color(item.id), stroke: "var(--color-card)" }
+                  : false
+              }
+              connectNulls={false}
+              isAnimationActive={false}
+            />
+          ))}
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  )
 
   return (
-    <div className="space-y-4">
-      {/* 顶部控制栏与视图切换（移动端响应式分行与防文字折行） */}
-      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between border-b border-border/50 pb-2.5">
-        <div className="flex items-center gap-2 flex-wrap min-w-0">
-          <Wifi className="size-4 text-primary shrink-0" />
-          <span className="font-semibold text-foreground text-xs whitespace-nowrap">网络延迟拓扑测控</span>
-          <Badge className="h-4.5 rounded-[1px] px-1.5 text-[11px] font-mono text-muted-foreground border-border/60 shrink-0">
-            {pingSeries.length} 条测试线路
-          </Badge>
-          {latencyDataSpan && (
-            <span className="text-xs text-muted-foreground font-medium hidden sm:inline truncate">
-              · {latencyDataSpan}
-            </span>
-          )}
+    <div className="monitor-charts space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-2">
+        <div>
+          <h2 className="text-sm font-semibold">网络延迟分析 · {pingSeries.length} 条线路</h2>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            卡片及排行统计完整 {hours < 24 ? `${hours} 小时` : `${hours / 24} 天`}
+            窗口；缩放仅影响时序图。延迟曲线为桶内中位数，区间带为最低至最高值；“桶中位均值”是成功桶中位数的算术平均，不是原始探测均值。
+          </p>
         </div>
-
-        {/* 交互工具栏：削峰开关与视图模式切换器 */}
-        <div className="flex items-center justify-between sm:justify-end gap-3 flex-wrap">
-          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground select-none shrink-0">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <input
               type="checkbox"
               checked={smooth}
-              onChange={(e) => onToggleSmooth(e.target.checked)}
-              className="accent-foreground rounded-[1px]"
+              onChange={(event) => onToggleSmooth(event.target.checked)}
             />
-            <span className="whitespace-nowrap">智能削峰</span>
+            削峰显示
           </label>
-
-          {/* 视图模式按钮（禁止文字换行） */}
-          <div className="flex items-center gap-1 rounded-[2px] border border-border/60 bg-muted/30 p-0.5 text-xs overflow-x-auto no-scrollbar shrink-0">
-            <button
-              type="button"
-              onClick={() => setViewMode("combined")}
-              className={cn(
-                "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors whitespace-nowrap shrink-0",
-                viewMode === "combined"
-                  ? "bg-primary text-primary-foreground font-medium shadow-2xs"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <TrendingUp className="size-3 shrink-0" />
-              <span className="whitespace-nowrap">聚合对比</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setViewMode("split")}
-              className={cn(
-                "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors whitespace-nowrap shrink-0",
-                viewMode === "split"
-                  ? "bg-primary text-primary-foreground font-medium shadow-2xs"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Grid className="size-3 shrink-0" />
-              <span className="whitespace-nowrap">分轨矩阵</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setViewMode("ranking")}
-              className={cn(
-                "flex items-center gap-1 rounded-[1px] px-2 py-0.5 transition-colors whitespace-nowrap shrink-0",
-                viewMode === "ranking"
-                  ? "bg-primary text-primary-foreground font-medium shadow-2xs"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <BarChart2 className="size-3 shrink-0" />
-              <span className="whitespace-nowrap">延迟排行</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 1. 探测线路指标卡片网格（直观卡片展现各线路现状、极值抖动与走势火花线） */}
-      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {probeSummaries.map((s) => {
-          const isShown = !hiddenProbes.includes(s.id)
-          const isSolo = hiddenProbes.length === pingSeries.length - 1 && isShown
-
-          // 计算 SVG 火花线路径
-          const spark = s.sparklineData
-          const minVal = Math.min(...spark, 0)
-          const maxVal = Math.max(...spark, 10)
-          const range = Math.max(1, maxVal - minVal)
-          const sparkW = 80
-          const sparkH = 24
-          const pointsStr = spark
-            .map((val, idx) => {
-              const x = (idx / (spark.length - 1 || 1)) * sparkW
-              const y = sparkH - ((val - minVal) / range) * (sparkH - 4) - 2
-              return `${x.toFixed(1)},${y.toFixed(1)}`
-            })
-            .join(" ")
-
-          return (
-            <div
-              key={`probe-card-${s.id}`}
-              onClick={() =>
-                setHiddenProbes((h) =>
-                  isShown ? [...h, s.id] : h.filter((id) => id !== s.id)
-                )
-              }
-              className={cn(
-                "group relative flex flex-col justify-between rounded-[2px] border p-2.5 transition-all duration-150 cursor-pointer select-none",
-                isShown
-                  ? "border-border/80 bg-card/75 shadow-2xs hover:border-primary/60"
-                  : "border-border/30 bg-muted/20 opacity-40 hover:opacity-70"
-              )}
-            >
-              {/* 卡片头部：线路名、色彩图例与质量徽标 */}
-              <div className="flex items-center justify-between gap-1.5">
-                <div className="flex items-center gap-1.5 truncate">
-                  <span
-                    className="h-2.5 w-1 rounded-[0.5px] shrink-0"
-                    style={{ backgroundColor: s.style.stroke }}
-                  />
-                  <span className="truncate text-xs font-semibold text-foreground">
-                    {s.name}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1 shrink-0">
-                  {s.loss > 0 && (
-                    <Badge className="h-4.5 px-1.5 text-[11px] rounded-[1px] font-mono border-destructive/40 bg-destructive/15 text-destructive font-semibold">
-                      丢 {s.loss < 1 ? "<1" : Math.round(s.loss)}%
-                    </Badge>
-                  )}
-                  <span className={cn("text-xs font-mono font-medium", s.tier.colorClass)}>
-                    {s.tier.label}
-                  </span>
-                </div>
-              </div>
-
-              {/* 卡片主体：大字当前延迟 + 迷你火花线 */}
-              <div className="my-2 flex items-baseline justify-between gap-2">
-                <div>
-                  <span className="font-mono text-xl font-bold tracking-tight text-foreground">
-                    {s.latest !== null ? Math.round(s.latest) : "—"}
-                  </span>
-                  <span className="ml-1 text-xs text-muted-foreground font-mono">ms</span>
-                </div>
-
-                {/* 纯 SVG 微型火花线趋势图 */}
-                {spark.length > 1 && (
-                  <svg width={sparkW} height={sparkH} className="overflow-visible opacity-85">
-                    <polyline
-                      fill="none"
-                      stroke={s.style.stroke}
-                      strokeWidth="1.5"
-                      strokeDasharray={s.style.dash}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      points={pointsStr}
-                    />
-                  </svg>
+          <div className="flex gap-1 rounded-[2px] border border-border/60 bg-muted/30 p-0.5">
+            {[
+              { key: "combined", label: "聚合对比" },
+              { key: "split", label: "分轨矩阵" },
+              { key: "loss", label: "探测失败率" },
+              { key: "ranking", label: "延迟排行" },
+            ].map((item) => (
+              <button
+                type="button"
+                key={item.key}
+                aria-pressed={view === item.key}
+                onClick={() => setView(item.key as ViewMode)}
+                className={cn(
+                  "rounded-[1px] px-2 py-1 text-xs transition-colors",
+                  view === item.key
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
-              </div>
-
-              {/* 卡片底部：极值统计与独占聚焦快捷按钮 */}
-              <div className="flex items-center justify-between border-t border-border/30 pt-1.5 text-xs font-mono text-muted-foreground">
-                <span className="font-medium">
-                  {s.avg !== null ? (
-                    <>
-                      均 {Math.round(s.avg)} · 极 {Math.round(s.min ?? 0)}-{Math.round(s.max ?? 0)}
-                    </>
-                  ) : (
-                    "暂无采样数据"
-                  )}
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleSolo(s.id)
-                  }}
-                  className={cn(
-                    "rounded-[1px] px-1.5 py-0.5 text-xs transition-colors font-medium",
-                    isSolo ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
-                  )}
-                  title={isSolo ? "取消单线聚焦" : "单线聚焦 (Solo)"}
-                >
-                  {isSolo ? "独占中" : "单线"}
-                </button>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* 2. 核心图表区域：根据用户选定的视图模式渲染 */}
-
-      {/* 2.1 聚合对比视图 (Combined View)：高度适中优雅，带底部深色自适应 Brush */}
-      {viewMode === "combined" && (
-        <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
-            <span className="flex items-center gap-1.5">
-              <TrendingUp className="size-3.5 text-primary" />
-              <span>多线路时序延迟对比（已选 {shownProbes.length}/{pingSeries.length} 线）</span>
-            </span>
-            <span className="text-xs font-mono font-normal text-muted-foreground">
-              拖动底部滑块可缩放时间区间
-            </span>
-          </div>
-
-          <div className="mt-2.5 h-80 w-full text-muted-foreground sm:h-96">
-            {shownProbes.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                没有选定任何探测线路，请点击上方卡片开启
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={pingRows}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                  <XAxis
-                    {...timeAxis(
-                      pingRows,
-                      Math.min(zoom?.[0] ?? 0, pingRows.length - 1),
-                      Math.min(zoom?.[1] ?? pingRows.length - 1, pingRows.length - 1)
-                    )}
-                  />
-                  <YAxis unit="ms" width={48} domain={["auto", "auto"]} {...AXIS} />
-                  <Tooltip
-                    {...TOOLTIP_STYLE}
-                    formatter={(v, name, item) => {
-                      const loss = Number(item?.payload?.[`l${String(item.dataKey).slice(1)}`] ?? 0)
-                      return [`${Math.round(Number(v))} ms${loss > 0 ? ` (丢包 ${loss}%)` : ""}`, name]
-                    }}
-                  />
-
-                  {/* 单线路激活时展示 Smokeping 烟雾区间 */}
-                  {shownProbes.length === 1 &&
-                    shownProbes.map((s) => (
-                      <Area
-                        key={`band-${s.id}`}
-                        dataKey={`${smooth ? "c" : "b"}${s.id}`}
-                        stroke="none"
-                        fill={getStyle(s.id).stroke}
-                        fillOpacity={0.16}
-                        isAnimationActive={false}
-                        tooltipType="none"
-                        legendType="none"
-                        connectNulls
-                      />
-                    ))}
-
-                  {/* 各线路折线 */}
-                  {shownProbes.map((s) => {
-                    const st = getStyle(s.id)
-                    return (
-                      <Line
-                        key={`line-${s.id}`}
-                        dataKey={`${smooth ? "s" : "t"}${s.id}`}
-                        name={s.name}
-                        stroke={st.stroke}
-                        strokeDasharray={st.dash}
-                        {...SERIES}
-                        connectNulls
-                      />
-                    )
-                  })}
-
-                  {/* 彻底解决深色模式大白块的优雅工控 Brush 时间滑块 */}
-                  <Brush
-                    dataKey="ts"
-                    height={22}
-                    travellerWidth={8}
-                    tickFormatter={clockFor(hours)}
-                    fill="var(--color-card)"
-                    stroke="var(--color-border)"
-                    fillOpacity={0.65}
-                    onChange={(r) =>
-                      setZoom([r.startIndex ?? 0, r.endIndex ?? pingRows.length - 1])
-                    }
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 2.2 分轨独立矩阵视图 (Split Lanes)：每条线路拥有独立 Y 轴，低延迟与高延迟互不干扰 */}
-      {viewMode === "split" && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {probeSummaries.map((s) => {
-            const isShown = !hiddenProbes.includes(s.id)
-            if (!isShown) return null
-
-            // 单线路专属数据行
-            const singleRows = pingRows.map((r) => ({
-              ts: r.ts,
-              latency: smooth ? r[`s${s.id}`] : r[`t${s.id}`],
-              band: smooth ? r[`c${s.id}`] : r[`b${s.id}`],
-            }))
-
-            return (
-              <div
-                key={`split-lane-${s.id}`}
-                className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs"
               >
-                <div className="flex items-center justify-between border-b border-border/40 pb-1.5 text-xs">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span
-                      className="size-2 rounded-[0.5px] shrink-0"
-                      style={{ backgroundColor: s.style.stroke }}
-                    />
-                    <span className="font-semibold text-foreground truncate">{s.name}</span>
-                  </div>
-                  <div className="font-mono text-xs text-muted-foreground font-medium">
-                    最新: {s.latest !== null ? Math.round(s.latest) : "—"}ms · 均值: {s.avg !== null ? `${Math.round(s.avg)}ms` : "—"}
-                  </div>
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      {smooth && (
+        <p className="text-[11px] text-muted-foreground">
+          削峰会抑制真实尖峰，仅用于辅助观察走势；卡片及排行保留原始统计，关闭后查看故障峰值。
+        </p>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span className="text-muted-foreground">
+          已选 {shown.length} / {summaries.length} 条 · 点击线路名称切换显示
+        </span>
+        <button
+          type="button"
+          onClick={() => setHidden([])}
+          className="text-primary transition-opacity hover:opacity-70"
+        >
+          显示全部
+        </button>
+      </div>
+      <div className="monitor-chart-grid monitor-chart-grid--compact">
+        {summaries.map((series) => (
+          <section
+            key={series.id}
+            className={cn(
+              "min-w-0 rounded-[2px] border border-border/70 bg-card/60 p-3 transition-opacity",
+              hidden.includes(series.id) && "opacity-45",
+            )}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                aria-pressed={!hidden.includes(series.id)}
+                onClick={() =>
+                  setHidden((all) =>
+                    all.includes(series.id)
+                      ? all.filter((id) => id !== series.id)
+                      : [...all, series.id],
+                  )
+                }
+                className="flex min-w-0 items-center gap-2 text-left text-xs font-semibold transition-colors hover:text-primary"
+              >
+                <span className="size-2 shrink-0" style={{ background: color(series.id) }} />
+                <span className="truncate" title={series.name}>
+                  {series.name}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => solo(series.id)}
+                className="shrink-0 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {shown.length === 1 && shown[0].id === series.id ? "取消聚焦" : "单线聚焦"}
+              </button>
+            </div>
+            <div className="my-3 flex items-center justify-between gap-2">
+              <div>
+                <div
+                  className={cn(
+                    "font-mono text-lg",
+                    (series.down || series.stale) && "text-destructive",
+                  )}
+                >
+                  {series.down ? "失败" : ms(series.latest)}
                 </div>
-
-                <div className="mt-2 h-44 w-full text-muted-foreground">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={singleRows}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                      <XAxis {...timeAxis(singleRows)} />
-                      <YAxis unit="ms" width={40} domain={["auto", "auto"]} {...AXIS} />
-                      <Tooltip
-                        {...TOOLTIP_STYLE}
-                        formatter={(v) => [`${Math.round(Number(v))} ms`, s.name]}
-                      />
-                      <Area
-                        dataKey="band"
-                        stroke="none"
-                        fill={s.style.stroke}
-                        fillOpacity={0.16}
-                        isAnimationActive={false}
-                        tooltipType="none"
-                        connectNulls
-                      />
-                      <Line
-                        dataKey="latency"
-                        name={s.name}
-                        stroke={s.style.stroke}
-                        strokeDasharray={s.style.dash}
-                        {...SERIES}
-                        connectNulls
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
+                <div className="mt-1 text-[11px] text-muted-foreground">{series.quality}</div>
               </div>
-            )
-          })}
+              <Sparkline points={series.points} step={step} stroke={color(series.id)} />
+            </div>
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-border/40 pt-2 text-[11px]">
+              {[
+                ["桶中位均值", ms(series.avg)],
+                ["最低", ms(series.min)],
+                ["峰值", ms(series.max)],
+                ["有效桶数", `${series.successBuckets} / ${series.points.length}`],
+                ["相邻桶波动", ms(series.jitter)],
+                ["窗口失败率", series.loss === null ? "未知" : `${series.loss.toFixed(2)}%`],
+              ].map(([label, value]) => (
+                <div key={label} className="flex flex-wrap justify-between gap-x-1">
+                  <dt className="text-muted-foreground">{label}</dt>
+                  <dd className="font-mono">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        ))}
+      </div>
+      {pingSeries.length === 0 && (
+        <div className="py-12 text-center text-xs text-muted-foreground">
+          当前窗口没有探测线路或历史数据
         </div>
       )}
-
-      {/* 2.3 线路延迟排行柱状图 (Ranking View)：直观阶梯对比哪条线路最快最优 */}
-      {viewMode === "ranking" && (
-        <div className="rounded-[2px] border border-border/70 bg-card/60 p-3 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-border/40 pb-2 text-xs font-semibold text-foreground">
-            <span className="flex items-center gap-1.5">
-              <BarChart2 className="size-3.5 text-primary" />
-              <span>各线路平均响应延迟梯队对比</span>
+      {/* 独立的全窗口缩放条避免卸载视图后 Brush 与保存的缩放状态分离。 */}
+      {rows.length > 1 && view !== "ranking" && (
+        <div className="rounded-[2px] border border-border/60 bg-card/60 p-3">
+          <div className="mb-2 flex justify-between text-[11px] text-muted-foreground">
+            <span>
+              时序图时间缩放 · {new Date(from * 1000).toLocaleString("zh-CN")} —{" "}
+              {new Date(to * 1000).toLocaleString("zh-CN")}
             </span>
-            <span className="text-xs font-mono font-normal text-muted-foreground">
-              按平均延迟从快到慢阶梯排列
-            </span>
+            <button
+              type="button"
+              onClick={() => setZoom(null)}
+              className="ml-2 shrink-0 text-primary"
+            >
+              重置
+            </button>
           </div>
-
-          <div className="mt-3 h-80 w-full text-muted-foreground">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={rankingData} layout="vertical" margin={{ left: 20, right: 30 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
-                <XAxis type="number" unit="ms" {...AXIS} />
-                <YAxis dataKey="name" type="category" width={80} {...AXIS} />
-                <Tooltip
-                  {...TOOLTIP_STYLE}
-                  formatter={(v, name) => [
-                    `${v} ms`,
-                    name === "avg" ? "平均延迟" : name === "min" ? "最低延迟" : "最高延迟",
-                  ]}
+          <div className="h-8 text-muted-foreground">
+            <ResponsiveContainer>
+              {/* 桶数量变化时重建缩放条的内部坐标，避免旧索引越界；时间选区仍由外层状态保留。 */}
+              <ComposedChart key={rows.length} data={rows}>
+                <Brush
+                  dataKey="ts"
+                  height={24}
+                  stroke="var(--color-border)"
+                  fill="var(--color-card)"
+                  tickFormatter={clockFor(hours)}
+                  startIndex={
+                    activeZoom
+                      ? Math.max(
+                          0,
+                          rows.findIndex((row) => Number(row.ts) >= from * 1000),
+                        )
+                      : 0
+                  }
+                  endIndex={
+                    activeZoom
+                      ? Math.max(
+                          0,
+                          rows.findLastIndex((row) => Number(row.ts) <= to * 1000),
+                        )
+                      : rows.length - 1
+                  }
+                  onChange={(range) => {
+                    const first = rows[range.startIndex ?? 0]
+                    const last = rows[range.endIndex ?? rows.length - 1]
+                    if (first && last && first.ts !== last.ts)
+                      setZoom({ hours, from: Number(first.ts) / 1000, to: Number(last.ts) / 1000 })
+                  }}
                 />
-                <Bar dataKey="avg" name="平均延迟" fill="var(--color-primary)" radius={[0, 2, 2, 0]} />
-              </BarChart>
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
       )}
+      <div key={view} className="animate-fade-in">
+        {shown.length === 0 ? (
+          noSelection
+        ) : view === "combined" ? (
+          <section className="rounded-[2px] border border-border/70 bg-card/60 p-3">
+            {chart(shown, "h-80")}
+          </section>
+        ) : view === "split" ? (
+          <div className="monitor-chart-grid">
+            {shown.map((series) => (
+              <section
+                key={series.id}
+                className="min-w-0 rounded-[2px] border border-border/70 bg-card/60 p-3"
+              >
+                <h3 className="mb-2 text-xs font-semibold">{series.name} · 独立 Y 轴</h3>
+                {chart([series], "h-48")}
+              </section>
+            ))}
+          </div>
+        ) : view === "loss" ? (
+          <div className="monitor-chart-grid">
+            {shown.map((series) => (
+              <section key={series.id} className="min-w-0 border border-border/70 bg-card/60 p-3">
+                <h3 className="mb-2 text-xs font-semibold">{series.name} · TCP 探测失败率</h3>
+                <p className="mb-3 text-[11px] text-muted-foreground">
+                  窗口失败率 {series.loss === null ? "未知" : `${series.loss.toFixed(2)}%`} ·
+                  分时百分比由服务端取整；空白时段无采样。
+                </p>
+                <div className="h-48 text-muted-foreground">
+                  <ResponsiveContainer>
+                    <ComposedChart data={plottedRows}>
+                      <CartesianGrid
+                        vertical={false}
+                        stroke="var(--color-border)"
+                        strokeDasharray="3 3"
+                      />
+                      <XAxis
+                        {...AXIS}
+                        dataKey="ts"
+                        type="number"
+                        domain={[from * 1000, to * 1000]}
+                        ticks={ticks}
+                        tickFormatter={tickClock(ticks, hours)}
+                        minTickGap={45}
+                      />
+                      <YAxis
+                        {...AXIS}
+                        domain={[0, 100]}
+                        tickFormatter={(v) => `${v}%`}
+                        width={42}
+                      />
+                      <Tooltip
+                        {...CHART_TOOLTIP}
+                        labelFormatter={(v) => new Date(Number(v)).toLocaleString("zh-CN")}
+                        formatter={(v) => `${Number(v)}%`}
+                      />
+                      <Line
+                        activeDot={CHART_ACTIVE_DOT}
+                        dataKey={`loss${series.id}`}
+                        name="桶内探测失败率"
+                        stroke={color(series.id)}
+                        strokeWidth={1}
+                        dot={false}
+                        connectNulls={false}
+                        isAnimationActive={false}
+                        tooltipType="none"
+                      />
+                      <Bar
+                        dataKey={`loss${series.id}`}
+                        name="桶内探测失败率"
+                        fill={color(series.id)}
+                        isAnimationActive={false}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : ranking.length === 0 ? (
+          <div className="py-12 text-center text-xs text-muted-foreground">
+            所选线路没有成功探测数据，无法计算延迟排行。
+          </div>
+        ) : (
+          <section className="rounded-[2px] border border-border/70 bg-card/60 p-3">
+            <p className="mb-3 text-[11px] text-muted-foreground">
+              按桶中位均值排序；结合失败率及采样新鲜度判断，不能据此直接排名线路质量。
+            </p>
+            <div
+              className="text-muted-foreground"
+              style={{ height: Math.max(160, ranking.length * 42) }}
+            >
+              <ResponsiveContainer>
+                <BarChart data={ranking} layout="vertical" margin={{ right: 20 }}>
+                  <CartesianGrid horizontal={false} stroke="var(--color-border)" />
+                  <XAxis {...AXIS} type="number" unit="ms" />
+                  <YAxis {...AXIS} dataKey="name" type="category" width={110} />
+                  <Tooltip
+                    {...CHART_TOOLTIP}
+                    labelFormatter={(v) => String(v)}
+                    formatter={(v) => ms(Number(v))}
+                  />
+                  <Bar dataKey="avg" name="桶中位均值" isAnimationActive={false}>
+                    {ranking.map((series) => (
+                      <Cell key={series.id} fill={color(series.id)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
+        )}
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        TCP 握手探测；失败与采集断档不连线。有采样且服务端省略失败率时按零处理，无采样显示未知。
+        {step > 60 ? "当前为聚合桶，延迟波动不等同于逐次探测抖动。" : ""}
+      </p>
     </div>
   )
-}
+})

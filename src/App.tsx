@@ -195,7 +195,7 @@ export default function App() {
             <NodeDetailSkeleton />
           ) : selected ? (
             <Suspense fallback={<NodeDetailSkeleton />}>
-              <NodeDetail node={selected} historyDays={me.history_days ?? 7} />
+              <NodeDetail key={selected.id} node={selected} historyDays={me.history_days ?? 7} />
             </Suspense>
           ) : (
             <div className="animate-fade-in py-20 text-center text-xs text-muted-foreground">

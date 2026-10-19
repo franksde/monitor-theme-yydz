@@ -149,8 +149,18 @@ eq(nodeTypes.archList[1], { name: "x86_64", count: 3 }, "x86_64 3台排第二")
 
 // 5. 过滤与排序测试
 const sampleNodes = [
-  mockNode({ id: 1, name: "tokyo-kvm", online: true, metrics: { ...mockNode().metrics!, cpu: 20 } as any }),
-  mockNode({ id: 2, name: "osaka-lxc", online: true, metrics: { ...mockNode().metrics!, cpu: 85 } as any }),
+  mockNode({
+    id: 1,
+    name: "tokyo-kvm",
+    online: true,
+    metrics: { ...mockNode().metrics!, cpu: 20 } as any,
+  }),
+  mockNode({
+    id: 2,
+    name: "osaka-lxc",
+    online: true,
+    metrics: { ...mockNode().metrics!, cpu: 85 } as any,
+  }),
   mockNode({ id: 3, name: "us-offline", online: false, metrics: null }),
 ]
 
@@ -169,31 +179,84 @@ eq(sortedByCpu[0].name, "osaka-lxc", "CPU 占用最高 85% 排最前")
 eq(sortedByCpu[1].name, "tokyo-kvm", "CPU 占用 20% 排第二")
 eq(sortedByCpu[2].name, "us-offline", "离线节点沉底排最后")
 
-// 6. 在线率 SLA 测试
+// 6. 在线率 SLA 测试（修复离线节点断档与无数据场景）
 const emptySla = calculateUptimeSla([], 60, 6)
-eq(emptySla.slaPct, 100, "空明细默认 100% SLA")
+eq(emptySla.slaPct, 0, "空明细无心跳真实反映 0% SLA")
+eq(emptySla.totalMinutes, 0, "空明细在线 0 分钟")
+eq(emptySla.expectedMinutes, 360, "6 小时窗口期望 360 分钟")
+eq(
+  emptySla.segments.every((s) => s.status === "down"),
+  true,
+  "空明细全段停机 down",
+)
 
 // 连续在线测试 (6小时，360个点全勤)
 const fullMetrics = Array.from({ length: 360 }, (_, i) => ({
   ts: 1000000 + i * 60,
   minutes: 1,
 }))
-const perfectSla = calculateUptimeSla(fullMetrics, 60, 6, 48)
+const perfectSla = calculateUptimeSla(fullMetrics, 60, 6, 48, 1000000 + 360 * 60)
 eq(perfectSla.slaPct, 100, "满额在线 100% SLA")
 eq(perfectSla.segments.length, 48, "生成 48 个分段")
-eq(perfectSla.segments.every((s) => s.status === "up"), true, "全部为健康 up")
+eq(
+  perfectSla.segments.every((s) => s.status === "up"),
+  true,
+  "全部为健康 up",
+)
 
-// 离线断档测试 (6小时离线1小时，300分钟在线，60分钟空洞)
+// 离线断档测试 (6小时中间离线1小时，300分钟在线，60分钟空洞)
 const gapMetrics: Array<{ ts: number; minutes: number }> = []
 for (let i = 0; i < 360; i++) {
   if (i >= 60 && i < 120) continue // 模拟掉线 1 小时
   gapMetrics.push({ ts: 1000000 + i * 60, minutes: 1 })
 }
-const gapSla = calculateUptimeSla(gapMetrics, 60, 6, 48)
+const gapSla = calculateUptimeSla(gapMetrics, 60, 6, 48, 1000000 + 360 * 60)
 eq(gapSla.slaPct, 83.33, "6小时离线1小时计算出 83.33% SLA")
 eq(gapSla.totalMinutes, 300, "实际在线分钟数 300")
 eq(gapSla.expectedMinutes, 360, "期望总分钟数 360")
-eq(gapSla.segments.some((s) => s.status === "down"), true, "离线断档时间段存在 down 标记")
+eq(
+  gapSla.segments.some((s) => s.status === "down"),
+  true,
+  "离线断档时间段存在 down 标记",
+)
+
+// 末尾离线停机测试 (6小时前4小时在线，后2小时彻底失联停机，基于当前基准时刻)
+// 旧逻辑会因以 latestTs 缩窗口而算出 100%，新逻辑如实算出 66.67% 且末尾分段全部为 down
+const endDownMetrics = Array.from({ length: 240 }, (_, i) => ({
+  ts: 1000000 + i * 60,
+  minutes: 1,
+}))
+const endDownSla = calculateUptimeSla(endDownMetrics, 60, 6, 48, 1000000 + 360 * 60)
+eq(endDownSla.slaPct, 66.67, "后2小时断网停机真实反映 66.67% SLA")
+eq(endDownSla.totalMinutes, 240, "实际在线 240 分钟")
+eq(endDownSla.expectedMinutes, 360, "期望 360 分钟")
+const lastSeg = endDownSla.segments[endDownSla.segments.length - 1]
+eq(lastSeg.status, "down", "当前末尾分段状态为停机 down")
+eq(lastSeg.minutes, 0, "末尾分段在线 0 分钟")
+
+// 聚合桶均匀分配到所有相交分段，总分段覆盖时长与总值一致。
+const hourly = Array.from({ length: 6 }, (_, i) => ({ ts: 1800000000 + i * 3600, minutes: 60 }))
+const hourlySla = calculateUptimeSla(hourly, 3600, 6, 48, 1800000000 + 21600)
+eq(hourlySla.slaPct, 100, "小时聚合连续覆盖 100%")
+eq(
+  hourlySla.segments.every((seg) => seg.status === "up"),
+  true,
+  "小时聚合所有分段均覆盖",
+)
+eq(
+  hourlySla.segments.reduce((sum, seg) => sum + seg.minutes, 0),
+  360,
+  "分段分钟与总分钟一致",
+)
+const duplicated = Array.from({ length: 60 }, () => ({ ts: 1800000000, minutes: 1 }))
+eq(calculateUptimeSla(duplicated, 60, 1, 48, 1800003600).totalMinutes, 1, "重复桶不重复计时")
+const shortSamples = Array.from({ length: 60 }, (_, i) => ({ ts: 1800000000 + i * 30 }))
+eq(calculateUptimeSla(shortSamples, 30, 1, 48, 1800003600).slaPct, 50, "30秒采样不放大为一分钟")
+eq(
+  calculateUptimeSla([{ ts: 1800000000, minutes: 30 }], 3600, 1, 48, 1800003600).slaPct,
+  50,
+  "部分覆盖桶保持真实覆盖比例",
+)
 
 if (failed) {
   console.error(`\nsummary 校验失败：${failed} 项不通过`)
@@ -201,4 +264,3 @@ if (failed) {
 } else {
   console.log("summary 模块单元测试全部通过")
 }
-

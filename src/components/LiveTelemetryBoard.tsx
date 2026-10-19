@@ -1,7 +1,7 @@
 /**
  * 实时遥测动态测控驾驶舱组件 (Live Telemetry Dashboard)
  * 具备：
- * 1. 显性 LIVE 状态指示（绿色呼吸脉冲灯、长连接 2s 自动刷新提示、最后心跳上报时间）
+ * 1. 显性 LIVE 状态指示（绿色呼吸脉冲灯、实时上报状态、最后心跳上报时间）
  * 2. 4 格工控实时动态仪表矩阵：
  *    - 实时 CPU 负荷与系统 1/5/15m 平均负载 (Load Average)
  *    - 实时物理内存占用与 Swap 交换空间使用状态
@@ -10,16 +10,7 @@
  * 遵循 AGENT.md 规范：微倒角 (rounded-[2px])、工控精密仪器质感、全中文注释。
  */
 
-import {
-  Activity,
-  ArrowDown,
-  ArrowUp,
-  Clock,
-  Cpu,
-  HardDrive,
-  Layers,
-  Radio,
-} from "lucide-react"
+import { Activity, ArrowDown, ArrowUp, Clock, Cpu, HardDrive, Layers, Radio } from "lucide-react"
 
 import type { Node } from "@/lib/api"
 import { bytes, percent, rate, uptime } from "@/lib/format"
@@ -30,7 +21,7 @@ export type LiveTelemetryBoardProps = {
 }
 
 export function LiveTelemetryBoard({ node }: LiveTelemetryBoardProps) {
-  const m = node.metrics
+  const m = node.online ? node.metrics : null
 
   // 瞬时使用百分比计算
   const cpuPct = m ? m.cpu : null
@@ -62,9 +53,14 @@ export function LiveTelemetryBoard({ node }: LiveTelemetryBoardProps) {
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 rounded-[2px] border border-online/30 bg-online/10 px-2 py-0.5 text-[11px] font-mono font-medium text-online shadow-2xs">
-            <span className="size-1.5 rounded-[0.5px] bg-online pulse-online" />
-            <span>LIVE 实时流 · 2s 自动推送</span>
+          <div className="flex items-center gap-1.5 rounded-[2px] border border-border/60 bg-muted/30 px-2 py-0.5 text-[11px] font-mono font-medium text-muted-foreground shadow-2xs">
+            <span
+              className={cn(
+                "size-1.5 rounded-[0.5px]",
+                node.online ? "bg-online pulse-online" : "bg-offline",
+              )}
+            />
+            <span>{node.online ? "LIVE · 实时上报" : "OFFLINE · 节点离线"}</span>
           </div>
         </div>
 
@@ -106,7 +102,7 @@ export function LiveTelemetryBoard({ node }: LiveTelemetryBoardProps) {
                       ? "text-destructive"
                       : cpuPct > 60
                         ? "text-warn"
-                        : "text-foreground"
+                        : "text-foreground",
                 )}
               >
                 {cpuPct !== null ? `${cpuPct.toFixed(1)}%` : "—"}
@@ -122,7 +118,7 @@ export function LiveTelemetryBoard({ node }: LiveTelemetryBoardProps) {
                     ? "bg-destructive"
                     : cpuPct !== null && cpuPct > 60
                       ? "bg-warn"
-                      : "bg-primary"
+                      : "bg-primary",
                 )}
                 style={{ width: `${Math.min(100, Math.max(0, cpuPct ?? 0))}%` }}
               />
@@ -150,7 +146,7 @@ export function LiveTelemetryBoard({ node }: LiveTelemetryBoardProps) {
                   {memPct !== null ? `${memPct.toFixed(1)}%` : "—"}
                 </span>
                 <span className="ml-1 text-[11px] font-mono text-muted-foreground">
-                  ({bytes(m?.mem_used ?? 0)} / {bytes(node.mem_total)})
+                  ({m ? bytes(m.mem_used) : "—"} / {bytes(node.mem_total)})
                 </span>
               </div>
             </div>
@@ -168,7 +164,7 @@ export function LiveTelemetryBoard({ node }: LiveTelemetryBoardProps) {
             <span className="text-muted-foreground/80">交换空间:</span>
             <span className="tnum font-medium text-foreground">
               {node.swap_total > 0
-                ? `${bytes(m?.swap_used ?? 0)} / ${bytes(node.swap_total)}${swapPct !== null ? ` (${swapPct.toFixed(0)}%)` : ""}`
+                ? `${m ? bytes(m.swap_used) : "—"} / ${bytes(node.swap_total)}${swapPct !== null ? ` (${swapPct.toFixed(0)}%)` : ""}`
                 : "未启用"}
             </span>
           </div>
@@ -185,25 +181,29 @@ export function LiveTelemetryBoard({ node }: LiveTelemetryBoardProps) {
               <div className="flex items-center gap-1.5 font-mono text-xs font-semibold tnum text-foreground">
                 <span className="flex items-center gap-0.5 text-primary">
                   <ArrowDown className="size-3" />
-                  {m ? rate(m.net_rx) : "0 B/s"}
+                  {m ? rate(m.net_rx) : "—"}
                 </span>
                 <span className="text-border select-none">·</span>
                 <span className="flex items-center gap-0.5 text-foreground/90">
                   <ArrowUp className="size-3" />
-                  {m ? rate(m.net_tx) : "0 B/s"}
+                  {m ? rate(m.net_tx) : "—"}
                 </span>
               </div>
             </div>
 
-            {/* 动态网速占用微指示条 */}
+            {/* 上下行速率相对占比；无采样或总速率为零时不填充 */}
             <div className="mt-2 h-1.5 w-full overflow-hidden rounded-[1px] bg-muted/80 flex gap-0.5">
               <div
                 className="h-full bg-primary transition-all duration-300"
-                style={{ width: `${Math.min(50, Math.max(2, m?.net_rx ? Math.log10(m.net_rx + 1) * 6 : 2))}%` }}
+                style={{
+                  width: `${m && m.net_rx + m.net_tx > 0 ? (m.net_rx / (m.net_rx + m.net_tx)) * 100 : 0}%`,
+                }}
               />
               <div
                 className="h-full bg-foreground/60 transition-all duration-300"
-                style={{ width: `${Math.min(50, Math.max(2, m?.net_tx ? Math.log10(m.net_tx + 1) * 6 : 2))}%` }}
+                style={{
+                  width: `${m && m.net_rx + m.net_tx > 0 ? (m.net_tx / (m.net_rx + m.net_tx)) * 100 : 0}%`,
+                }}
               />
             </div>
           </div>
@@ -229,7 +229,7 @@ export function LiveTelemetryBoard({ node }: LiveTelemetryBoardProps) {
                   {diskPct !== null ? `${diskPct.toFixed(1)}%` : "—"}
                 </span>
                 <span className="ml-1 text-[11px] font-mono text-muted-foreground">
-                  ({bytes(m?.disk_used ?? 0)} / {bytes(node.disk_total)})
+                  ({m ? bytes(m.disk_used) : "—"} / {bytes(node.disk_total)})
                 </span>
               </div>
             </div>
@@ -239,7 +239,7 @@ export function LiveTelemetryBoard({ node }: LiveTelemetryBoardProps) {
               <div
                 className={cn(
                   "h-full transition-all duration-300",
-                  diskPct !== null && diskPct > 85 ? "bg-warn" : "bg-primary"
+                  diskPct !== null && diskPct > 85 ? "bg-warn" : "bg-primary",
                 )}
                 style={{ width: `${Math.min(100, Math.max(0, diskPct ?? 0))}%` }}
               />
@@ -247,7 +247,7 @@ export function LiveTelemetryBoard({ node }: LiveTelemetryBoardProps) {
           </div>
 
           <div className="mt-3 border-t border-border/30 pt-2 text-[11px] font-mono text-muted-foreground flex items-center justify-between">
-            <span className="text-muted-foreground/80">活跃进程 / 今日吞吐:</span>
+            <span className="text-muted-foreground/80">系统进程 / 今日吞吐:</span>
             <span className="tnum font-medium text-foreground">
               {m ? `${m.procs} 进程` : "—"} · {bytes(node.day_rx + node.day_tx)}
             </span>

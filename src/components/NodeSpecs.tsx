@@ -167,11 +167,11 @@ export function NodeSpecs({ node }: NodeSpecsProps) {
             <div className="flex items-center justify-between py-1.5">
               <span className="text-muted-foreground">计量模式</span>
               <span className="font-mono font-medium text-foreground">
-                {node.traffic_mode === "rx"
+                {node.traffic_mode === "down"
                   ? "仅计算下行入网"
-                  : node.traffic_mode === "tx"
+                  : node.traffic_mode === "up"
                     ? "仅计算上行出网"
-                    : "双向出入网累计"}
+                    : node.traffic_mode === "max" ? "双向取较大值" : "双向出入网累计"}
               </span>
             </div>
           </div>

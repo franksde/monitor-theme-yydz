@@ -272,7 +272,7 @@
   rx: 2px !important;
 }
 
-.recharts-brush .recharts-brush-background {
+.recharts-brush > rect:not(.recharts-brush-slide) {
   fill: var(--color-card) !important;
   fill-opacity: 0.8 !important;
   stroke: var(--color-border) !important;
@@ -282,12 +282,13 @@
 
 .recharts-brush .recharts-brush-traveller rect {
   fill: var(--color-secondary) !important;
-  stroke: var(--color-border) !important;
+  stroke: var(--color-muted-foreground) !important;
   stroke-width: 1.2px !important;
   rx: 1px !important;
 }
 
-.recharts-brush .recharts-brush-traveller path {
+.recharts-brush .recharts-brush-traveller path,
+.recharts-brush .recharts-brush-traveller line {
   stroke: var(--color-foreground) !important;
   stroke-width: 1.2px !important;
 }
@@ -300,3 +301,48 @@
 }
 
 
+/* 监控图表共用栅格：单图铺满，宽屏末行两图均分，避免固定列数留下空位。 */
+.monitor-chart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+}
+.monitor-chart-grid:empty { display: none; }
+.monitor-chart-grid > * { min-width: 0; }
+@media (min-width: 1024px) {
+  .monitor-chart-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .monitor-chart-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+/* 占比图使用紧凑列宽，末行按实际卡片数量均分，不拉出一列无意义的留白。 */
+@media (min-width: 640px) {
+  .monitor-chart-grid--compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .monitor-chart-grid--compact > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+@media (min-width: 1100px) {
+  .monitor-chart-grid--compact { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .monitor-chart-grid--compact > * { grid-column: span 2; }
+  .monitor-chart-grid--compact > :last-child:nth-child(odd) { grid-column: span 2; }
+  .monitor-chart-grid--compact > :nth-last-child(2):nth-child(3n + 1),
+  .monitor-chart-grid--compact > :last-child:nth-child(3n + 2) { grid-column: span 3; }
+  .monitor-chart-grid--compact > :last-child:nth-child(3n + 1) { grid-column: 1 / -1; }
+}
+/* 交互视觉沿用全局主题，包含 SVG 键盘焦点、复选框与缩放手柄内部线条。 */
+.monitor-charts input[type="checkbox"] { accent-color: var(--color-primary); }
+.monitor-charts :is(button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+.monitor-charts .recharts-default-tooltip {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.monitor-charts :is(.recharts-tooltip-cursor, .recharts-active-dot, .recharts-brush-traveller) {
+  transition: fill 160ms ease, stroke 160ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .monitor-charts *, .monitor-charts *::before, .monitor-charts *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

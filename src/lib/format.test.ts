@@ -190,6 +190,9 @@ eq(money(100, "港币"), "港币 100.00", "旧 hub 存下的非法代码不抛�
 eq(osName("Debian GNU/Linux 12 (bookworm)"), "Debian 12", "发行版名去掉代号")
 eq(cpuName("Intel(R) Xeon(R) CPU E5-2680 8-Core Processor"), "Intel Xeon E5-2680", "CPU 名去掉商标和核数")
 
+// 已知后端步长时，不因稀疏样本的中位间距而跨过缺测段。
+eq(withGaps([{ ts: 0 }, { ts: 120000 }], 60000), [{ ts: 0 }, { ts: 60000 }, { ts: 120000 }], "接口步长保留单桶缺测")
+
 if (failed) {
   console.error(`\n${failed} 项不通过`)
   throw new Error("format 校验未通过")
