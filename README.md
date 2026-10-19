@@ -1,5 +1,7 @@
 # monitor-theme-default (Enhanced)
 
+> 本仓库 fork 自 [kiusnax/monitor-theme-yydz](https://github.com/kiusnax/monitor-theme-yydz)，在其基础上调整界面，原作者版权见 [LICENSE](LICENSE)。带假数据的本地预览见 [MOCK.md](MOCK.md)。
+
 > 本项目基于 [monitor](https://github.com/monitor-probe/monitor) 官方内置默认主题深度修改与重构而来。在延续轻量、高性能、纯静态 SPA 与黑白极简纯粹质感的同时，全面升级为**精密微倒角工业仪器风**，并针对多节点展示、深度资源遥测与网络质量洞察进行了多项功能增强与体验修复。
 
 ![主题预览](./preview.png)

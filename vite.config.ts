@@ -1,9 +1,20 @@
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
+import { readFileSync } from "node:fs"
+
+// MOCK=1：把 monitor-themes 预览站的假 hub（mock/hub.js）内联到 <head> 最前面，不连真实 hub 也有
+// 30 个节点的数据。不在 public/ 里，所以正式构建的主题包不带它。
+const mockHub = {
+  name: "mock-hub",
+  transformIndexHtml: (html: string) =>
+    process.env.MOCK
+      ? html.replace(/<head>/i, `<head>\n    <script>${readFileSync(import.meta.dirname + "/mock/hub.js", "utf8")}</script>`)
+      : html,
+}
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), mockHub],
   // import.meta.dirname rather than new URL(...).pathname: the latter is
   // URL-encoded, so a checkout under a path containing a space or a non-ASCII
   // name resolves to %20 and the alias silently points nowhere.

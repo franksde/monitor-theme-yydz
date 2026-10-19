@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:mock": "MOCK=1 vite",
+    "build:mock": "MOCK=1 vite build --outDir dist-mock",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "test": "node src/lib/format.test.ts && node src/lib/api.test.ts && node src/lib/geo.test.ts && node src/lib/latency.test.ts && node src/lib/summary.test.ts && node src/lib/telemetry.test.ts",
