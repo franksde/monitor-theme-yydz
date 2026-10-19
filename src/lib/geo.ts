@@ -145,6 +145,36 @@ export function projectFlat(
   return { x, y }
 }
 
+/** 地图纵向视窗（纬度，北为正） */
+export type LatWindow = { top: number; bottom: number }
+
+/**
+ * 按节点纬度裁出地图的纵向视窗：上下各留 pad 度余量，跨度不足 minSpan 时以中心向两边扩，
+ * 碰到 ±80° 边界就整体平移。节点只集中在几个纬度带时，地图不必画出整个南北半球。
+ */
+export function fitLatWindow(lats: number[], pad = 12, minSpan = 70): LatWindow {
+  const { minLat, maxLat } = FLAT_MAP_VIEW
+  if (lats.length === 0) return { top: maxLat, bottom: minLat }
+  const span = Math.min(maxLat - minLat, minSpan)
+  let top = Math.min(maxLat, Math.max(...lats) + pad)
+  let bottom = Math.max(minLat, Math.min(...lats) - pad)
+  if (top - bottom < span) {
+    const mid = (top + bottom) / 2
+    top = mid + span / 2
+    bottom = mid - span / 2
+    if (top > maxLat) [top, bottom] = [maxLat, maxLat - span]
+    if (bottom < minLat) [top, bottom] = [minLat + span, minLat]
+  }
+  return { top, bottom }
+}
+
+/** 纬度视窗换算成 viewBox 的纵向区间，坐标系与 projectFlat 相同 */
+export function latWindowToView(win: LatWindow, height: number = FLAT_MAP_VIEW.height): { y: number; height: number } {
+  const y0 = projectFlat(0, win.top, FLAT_MAP_VIEW.width, height).y
+  const y1 = projectFlat(0, win.bottom, FLAT_MAP_VIEW.width, height).y
+  return { y: y0, height: y1 - y0 }
+}
+
 /**
  * 同一地区多节点紧凑工控矩阵偏移量计算器
  * @param count 该地区的节点总数

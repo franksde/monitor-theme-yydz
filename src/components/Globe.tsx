@@ -5,7 +5,7 @@
  * 遵循 AGENT.md 规范：采用中文注释、无缝平滑动画、微倒角 (2px) 工控极简风格、零多余外部依赖。
  */
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   Globe as GlobeIcon,
   Maximize2,
@@ -19,8 +19,11 @@ import type { Node } from "@/lib/api"
 import { FLAGS } from "@/lib/flags"
 import {
   FLAT_MAP_VIEW,
+  fitLatWindow,
   generateFlatGraticules,
+  latWindowToView,
   generateFlatLandGeometry,
+  projectFlat,
   projectRegionBeacons,
   resolveNodeGeo,
   summarizeRegions,
@@ -36,6 +39,11 @@ export type GlobeProps = {
   onSelectRegion: (regionKey: string | null) => void
   onOpenNode: (nodeId: number) => void
 }
+
+// 地图最矮高度（px）：节点只在一条纬度带里时，地图也不压得太扁
+const MAP_MIN_HEIGHT = 220
+// 渲染宽度 px 下，纬度跨度 span° 对应的高度是 span * px / 320（800×400 的视口画 160° 纬度）
+const DEG_PER_PX_UNIT = (FLAT_MAP_VIEW.maxLat - FLAT_MAP_VIEW.minLat) * 2
 
 export function Globe({
   nodes,
@@ -85,6 +93,21 @@ export function Globe({
     return projectRegionBeacons(regions, FLAT_MAP_VIEW.width, FLAT_MAP_VIEW.height)
   }, [regions])
 
+  // 5. 纵向自适应：只画节点所在的纬度带，跨度下限按地图实际宽度换算成 MAP_MIN_HEIGHT
+  const svgRef = useRef<SVGSVGElement>(null)
+  const [mapWidth, setMapWidth] = useState(0)
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => setMapWidth(entry.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const view = useMemo(() => {
+    const minSpan = mapWidth > 0 ? Math.max(70, (MAP_MIN_HEIGHT * DEG_PER_PX_UNIT) / mapWidth) : 70
+    return latWindowToView(fitLatWindow(regions.map((r) => r.lat), 12, minSpan))
+  }, [regions, mapWidth])
+
   // 鼠标悬停亮点：仅在桌面端（支持 hover 的精细指针设备）计算浮层坐标并弹出小卡片
   const handleBeaconEnter = (
     beacon: ProjectedRegionBeacon,
@@ -108,9 +131,9 @@ export function Globe({
       const svgRect = svg.getBoundingClientRect()
       const containerRect = container.getBoundingClientRect()
       const scaleX = svgRect.width / FLAT_MAP_VIEW.width
-      const scaleY = svgRect.height / FLAT_MAP_VIEW.height
+      const scaleY = svgRect.height / view.height
       const screenX = svgRect.left - containerRect.left + beacon.pt.x * scaleX
-      const screenY = svgRect.top - containerRect.top + beacon.pt.y * scaleY
+      const screenY = svgRect.top - containerRect.top + (beacon.pt.y - view.y) * scaleY
       setActiveCard({
         region: beacon.region,
         x: screenX,
@@ -151,9 +174,9 @@ export function Globe({
       const svgRect = svg.getBoundingClientRect()
       const containerRect = container.getBoundingClientRect()
       const scaleX = svgRect.width / FLAT_MAP_VIEW.width
-      const scaleY = svgRect.height / FLAT_MAP_VIEW.height
+      const scaleY = svgRect.height / view.height
       const screenX = svgRect.left - containerRect.left + beacon.pt.x * scaleX
-      const screenY = svgRect.top - containerRect.top + beacon.pt.y * scaleY
+      const screenY = svgRect.top - containerRect.top + (beacon.pt.y - view.y) * scaleY
       setActiveCard({
         region: beacon.region,
         x: screenX,
@@ -202,11 +225,16 @@ export function Globe({
     { text: "180°E", x: FLAT_MAP_VIEW.width - 20 },
   ]
 
+  // 纬度标尺只标视窗内、离上下边缘有余量的那几条
   const latLabels = [
-    { text: "60°N", y: 53 },
-    { text: "0°", y: 203 },
-    { text: "60°S", y: 353 },
+    { text: "60°N", lat: 60 },
+    { text: "30°N", lat: 30 },
+    { text: "0°", lat: 0 },
+    { text: "30°S", lat: -30 },
+    { text: "60°S", lat: -60 },
   ]
+    .map((l) => ({ text: l.text, y: projectFlat(0, l.lat).y + 3 }))
+    .filter((l) => l.y > view.y + 24 && l.y < view.y + view.height - 6)
 
   // 计算桌面端小卡片的智能安全定位（自适应左右与上下，杜绝视口溢出）
   const cardStyle: React.CSSProperties = activeCard
@@ -265,7 +293,7 @@ export function Globe({
       </div>
 
       {/* 核心展示区：左侧平面地图大屏，右侧地区控制台 */}
-      <div className="mt-3.5 grid gap-4 lg:grid-cols-12 lg:items-center">
+      <div className="mt-3.5 grid gap-4 lg:grid-cols-12 lg:items-stretch">
         {/* 平面地图视口 */}
         <div
           ref={containerRef}
@@ -273,8 +301,10 @@ export function Globe({
           className="relative z-30 col-span-12 flex items-center justify-center rounded-[2px] border border-border/40 bg-muted/15 p-2 select-none lg:col-span-8"
         >
           <svg
-            viewBox={`0 0 ${FLAT_MAP_VIEW.width} ${FLAT_MAP_VIEW.height}`}
-            className="w-full h-auto aspect-[2/1]"
+            ref={svgRef}
+            viewBox={`0 ${view.y} ${FLAT_MAP_VIEW.width} ${view.height}`}
+            className="w-full h-auto"
+            style={{ aspectRatio: `${FLAT_MAP_VIEW.width} / ${view.height}` }}
             aria-label="平面世界节点拓扑地图"
           >
             <defs>
@@ -303,9 +333,9 @@ export function Globe({
             {/* 1. 地图背景底盘（点击可关闭当前浮层卡片） */}
             <rect
               x="0"
-              y="0"
+              y={view.y}
               width={FLAT_MAP_VIEW.width}
-              height={FLAT_MAP_VIEW.height}
+              height={view.height}
               fill="url(#mapOceanGrad)"
               stroke="var(--color-border)"
               strokeWidth="0.8"
@@ -355,7 +385,7 @@ export function Globe({
             {/* 4. 地图四周边框刻度与经纬标尺文本 */}
             <g className="fill-muted-foreground text-[8px] font-mono select-none opacity-60">
               {lngLabels.map((lbl, i) => (
-                <text key={`lng-${i}`} x={lbl.x} y="11" textAnchor="middle">
+                <text key={`lng-${i}`} x={lbl.x} y={view.y + 11} textAnchor="middle">
                   {lbl.text}
                 </text>
               ))}
@@ -509,7 +539,7 @@ export function Globe({
         </div>
 
       {/* 右侧：地区测控控制台与统计面板（设置 z-10，使左侧地图及弹窗 z-30/z-50 拥有更高绝对层级） */}
-      <div className="relative z-10 col-span-12 flex flex-col gap-2.5 lg:col-span-4">
+      <div className="relative z-10 col-span-12 flex flex-col gap-2.5 lg:col-span-4 lg:h-0 lg:min-h-full">
         <div className="flex items-center justify-between border-b border-border/50 pb-1.5">
           <span className="text-xs font-medium text-foreground">地区测控列表</span>
           {selectedRegion ? (
@@ -529,7 +559,7 @@ export function Globe({
         </div>
 
         {/* 地区列表滚动区（微倒角工业风格） */}
-        <div className="flex max-h-72 flex-col gap-1 overflow-y-auto pr-1">
+        <div className="flex max-h-72 flex-col gap-1 overflow-y-auto pr-1 lg:max-h-none lg:min-h-0 lg:flex-1">
           {regions.map((reg) => {
             const isSelected = selectedRegion === reg.key
             const flagUrl = FLAGS[reg.country]

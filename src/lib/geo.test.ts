@@ -19,6 +19,8 @@ import {
   projectNodesWithClustering,
   getBeaconBrightness,
   projectRegionBeacons,
+  fitLatWindow,
+  latWindowToView,
 } from "./geo.ts"
 import type { Node } from "./api.ts"
 
@@ -174,5 +176,27 @@ assert.equal(regionBeacons.length, summary.length)
 assert.equal(regionBeacons[0].region.key, summary[0].key)
 assert.ok(regionBeacons[0].pt.x > 0 && regionBeacons[0].pt.x < 800)
 assert.ok(regionBeacons[0].pt.y > 0 && regionBeacons[0].pt.y < 400)
+
+// 地图纵向自适应：按节点纬度裁出视窗，两头留余量，跨度不小于下限，不超出地图范围
+// 没有节点：整张地图
+assert.deepEqual(fitLatWindow([]), { top: 80, bottom: -80 })
+// 北美、欧洲、东亚到悉尼：上下各留 12°
+assert.deepEqual(fitLatWindow([52, 37, 35, 1.3, -33.9]), { top: 64, bottom: -45.9 })
+// 只有日港德英：跨度不足 70° 时以中心向两边扩到 70°
+const narrow = fitLatWindow([35.7, 22.3, 50.1, 51.5])
+assert.ok(Math.abs(narrow.top - narrow.bottom - 70) < 1e-9)
+assert.ok(Math.abs((narrow.top + narrow.bottom) / 2 - (51.5 + 22.3) / 2) < 1e-9)
+// 跨度下限可由调用方按像素换算后传入
+const tall = fitLatWindow([35.7, 22.3], 12, 100)
+assert.ok(Math.abs(tall.top - tall.bottom - 100) < 1e-9)
+// 扩展碰到边界时整体平移，不超出 ±80°
+assert.deepEqual(fitLatWindow([78]), { top: 80, bottom: 10 })
+assert.deepEqual(fitLatWindow([-79]), { top: -10, bottom: -80 })
+// 南北都有极端点时就是整张地图
+assert.deepEqual(fitLatWindow([75, -75]), { top: 80, bottom: -80 })
+
+// 纬度视窗换算成 SVG viewBox 的纵向区间（与 projectFlat 同一坐标系）
+assert.deepEqual(latWindowToView({ top: 80, bottom: -80 }, 400), { y: 0, height: 400 })
+assert.deepEqual(latWindowToView({ top: 40, bottom: -40 }, 400), { y: 100, height: 200 })
 
 console.log("geo 模块单元测试全部通过")
