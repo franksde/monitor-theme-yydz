@@ -312,7 +312,7 @@ function NodeList({
                   aria-pressed={current === value}
                   size="sm"
                   variant={current === value ? "secondary" : "ghost"}
-                  className={`shrink-0 rounded-[2px] transition-all duration-150 ${
+                  className={`shrink-0 whitespace-nowrap rounded-[2px] transition-all duration-150 ${
                     current === value
                       ? "border-border/80 font-semibold shadow-2xs"
                       : "opacity-75 hover:opacity-100"
@@ -336,7 +336,7 @@ function NodeList({
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 gap-1.5 rounded-[2px] px-2.5 text-xs text-muted-foreground hover:text-foreground border border-border/40"
+              className="h-8 gap-1.5 whitespace-nowrap rounded-[2px] px-2.5 text-xs text-muted-foreground hover:text-foreground border border-border/40"
               onClick={() => setGlobeOpen((v) => !v)}
             >
               <span>{globeOpen ? "收起地球" : "展开地球"}</span>

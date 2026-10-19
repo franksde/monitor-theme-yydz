@@ -15,6 +15,7 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
+import { meterTone } from "@/components/Meter"
 import { Country } from "@/components/NodeCard"
 import { speedHistory, type Node } from "@/lib/api"
 import { bytes, money, rate } from "@/lib/format"
@@ -46,11 +47,11 @@ function Tile({
       )}
     >
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex flex-1 items-center gap-1.5 min-w-0">
           <span className="flex size-5 shrink-0 items-center justify-center rounded-[1px] border border-border/40 bg-muted/40 transition-colors group-hover:border-foreground/20">
             <Icon className="size-3 text-foreground/80" />
           </span>
-          <span className="font-medium tracking-tight text-muted-foreground truncate">{label}</span>
+          <span className="flex-1 min-w-0 font-medium tracking-tight text-muted-foreground truncate">{label}</span>
         </div>
         {badge}
       </div>
@@ -203,9 +204,9 @@ export function Summary({
           {nodes.length > 0 ? (
             <div className="mt-auto space-y-1.5 pt-1 text-xs">
               {/* 虚拟化分布 */}
-              <div className="flex items-center justify-between gap-1.5">
-                <span className="text-[11px] font-medium text-muted-foreground shrink-0">虚拟化</span>
-                <div className="flex flex-wrap items-center justify-end gap-1 overflow-hidden">
+              <div className="flex items-start gap-1.5">
+                <span className="w-12 shrink-0 pt-0.5 text-[11px] font-medium text-muted-foreground">虚拟化</span>
+                <div className="flex min-w-0 flex-1 flex-wrap items-center justify-start gap-1">
                   {nodeTypes.virtList.map((item) => (
                     <span
                       key={item.name}
@@ -220,9 +221,9 @@ export function Summary({
               </div>
 
               {/* 架构分布 */}
-              <div className="flex items-center justify-between gap-1.5">
-                <span className="text-[11px] font-medium text-muted-foreground shrink-0">系统架构</span>
-                <div className="flex flex-wrap items-center justify-end gap-1 overflow-hidden">
+              <div className="flex items-start gap-1.5">
+                <span className="w-12 shrink-0 pt-0.5 text-[11px] font-medium text-muted-foreground">系统架构</span>
+                <div className="flex min-w-0 flex-1 flex-wrap items-center justify-start gap-1">
                   {nodeTypes.archList.map((item) => (
                     <span
                       key={item.name}
@@ -261,11 +262,11 @@ export function Summary({
 
         {/* 4. 最忙节点与最高负载 */}
         <Tile icon={Activity} label="最高负载">
-          <div className="tnum mt-1.5 text-xl font-bold tracking-tight">{busiest ? `${cpu.toFixed(1)}%` : "—"}</div>
+          <div className={cn("tnum mt-1.5 text-xl font-bold tracking-tight", busiest && meterTone(cpu).text)}>{busiest ? `${cpu.toFixed(1)}%` : "—"}</div>
           <div
             className={cn(
               "mt-auto truncate pt-1 text-xs",
-              cpu >= 85 ? "font-semibold text-destructive" : "text-muted-foreground",
+              "text-muted-foreground",
             )}
             title={busiest ? `${busiest.name} (CPU: ${cpu.toFixed(1)}%)` : undefined}
           >
@@ -284,14 +285,14 @@ export function Summary({
           <div className="mt-auto space-y-1 pt-1">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>已用 {bytes(usedMem)}</span>
-              <span className="tnum font-mono text-[11px] font-medium">{memPct.toFixed(0)}%</span>
+              <span className={cn("tnum font-mono text-[11px] font-medium", meterTone(memPct).text)}>{memPct.toFixed(0)}%</span>
             </div>
             {/* 工控微倒角使用率指示条 */}
             <div className="h-1 w-full overflow-hidden rounded-[1px] bg-muted/60">
               <div
                 className={cn(
                   "h-full rounded-[1px] transition-all duration-300",
-                  memPct >= 90 ? "bg-destructive" : memPct >= 75 ? "bg-warn" : "bg-primary",
+                  meterTone(memPct).bar,
                 )}
                 style={{ width: `${Math.min(100, Math.max(0, memPct))}%` }}
               />
@@ -307,14 +308,14 @@ export function Summary({
           <div className="mt-auto space-y-1 pt-1">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>已用 {bytes(usedDisk)}</span>
-              <span className="tnum font-mono text-[11px] font-medium">{diskPct.toFixed(0)}%</span>
+              <span className={cn("tnum font-mono text-[11px] font-medium", meterTone(diskPct).text)}>{diskPct.toFixed(0)}%</span>
             </div>
             {/* 工控微倒角使用率指示条 */}
             <div className="h-1 w-full overflow-hidden rounded-[1px] bg-muted/60">
               <div
                 className={cn(
                   "h-full rounded-[1px] transition-all duration-300",
-                  diskPct >= 90 ? "bg-destructive" : diskPct >= 75 ? "bg-warn" : "bg-primary",
+                  meterTone(diskPct).bar,
                 )}
                 style={{ width: `${Math.min(100, Math.max(0, diskPct))}%` }}
               />
@@ -434,7 +435,7 @@ export function Summary({
             <div className="mt-1 divide-y divide-border/30">
               {expiry.list.slice(0, 4).map(({ node: n, days }, idx) => (
                 <div key={n.id} className="flex items-center justify-between gap-2 py-1 text-xs">
-                  <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="flex flex-1 items-center gap-1.5 min-w-0">
                     <span className="flex size-4 shrink-0 items-center justify-center rounded-[1px] bg-muted/70 text-[10px] font-mono font-semibold text-muted-foreground">
                       {idx + 1}
                     </span>
@@ -451,7 +452,7 @@ export function Summary({
                   <div className="shrink-0">
                     <Badge
                       className={cn(
-                        "h-4.5 px-1.5 text-[11px] font-mono font-medium rounded-[1px]",
+                        "h-4.5 shrink-0 whitespace-nowrap px-1.5 text-[11px] font-mono font-medium rounded-[1px]",
                         days < 0
                           ? "border-destructive/40 bg-destructive/15 text-destructive font-semibold"
                           : days <= 3

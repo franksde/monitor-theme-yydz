@@ -86,7 +86,7 @@ export function NodeFilterBar({
             type="button"
             onClick={() => onStatusChange("all")}
             className={cn(
-              "rounded-[1px] px-2 py-0.5 font-medium transition-colors",
+              "whitespace-nowrap rounded-[1px] px-2 py-0.5 font-medium transition-colors",
               status === "all"
                 ? "bg-primary text-primary-foreground shadow-2xs"
                 : "text-muted-foreground hover:text-foreground",
@@ -98,20 +98,20 @@ export function NodeFilterBar({
             type="button"
             onClick={() => onStatusChange("online")}
             className={cn(
-              "rounded-[1px] px-2 py-0.5 font-medium transition-colors",
+              "whitespace-nowrap rounded-[1px] px-2 py-0.5 font-medium transition-colors",
               status === "online"
                 ? "bg-primary text-primary-foreground shadow-2xs"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            在线
+            在线 ({totalCount - offlineCount})
           </button>
           {offlineCount > 0 && (
             <button
               type="button"
               onClick={() => onStatusChange("offline")}
               className={cn(
-                "rounded-[1px] px-2 py-0.5 font-medium transition-colors",
+                "whitespace-nowrap rounded-[1px] px-2 py-0.5 font-medium transition-colors",
                 status === "offline"
                   ? "bg-warn text-warn-foreground shadow-2xs"
                   : "text-warn hover:underline",

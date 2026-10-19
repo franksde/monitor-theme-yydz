@@ -7,7 +7,7 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
-import { Meter } from "@/components/Meter"
+import { Meter, MeterText } from "@/components/Meter"
 import { LatencySection } from "@/components/LatencySection"
 import type { Node } from "@/lib/api"
 import { bytes, daysUntil, FOREVER, osName, pair, percent, rate, sinceSeen, uptime } from "@/lib/format"
@@ -52,7 +52,7 @@ export function Status({ node }: { node: Node }) {
   return (
     <Badge
       className={cn(
-        "tnum shrink-0 gap-1.5 font-normal tracking-tight transition-all duration-150",
+        "tnum shrink-0 gap-1.5 whitespace-nowrap font-normal tracking-tight transition-all duration-150",
         !node.online && "text-muted-foreground opacity-80"
       )}
     >
@@ -119,11 +119,11 @@ function trafficFoot(node: Node) {
 /** 到期日指示器：过期标红，临期预警，永久显示无限符号 */
 function Expiry({ node }: { node: Node }) {
   const days = node.expires_in !== undefined ? node.expires_in : daysUntil(node.expires_at)
-  if (days === null) return <span className="text-xs text-muted-foreground" title="永不到期">{FOREVER}</span>
-  const tone = days < 0 ? "text-destructive font-medium" : days <= 7 ? "text-warn font-medium" : "text-muted-foreground"
+  if (days === null) return <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground" title="永不到期">{FOREVER}</span>
+  const tone = days <= 3 ? "text-destructive font-semibold" : days <= 7 ? "text-warn font-semibold" : "text-muted-foreground"
   return (
-    <span className={cn("tnum text-xs transition-colors", tone)}>
-      {days < 0 ? `已过期 ${-days} 天` : `${days} 天后到期`}
+    <span className={cn("tnum shrink-0 whitespace-nowrap text-xs transition-colors", tone)}>
+      {days < 0 ? `已过期 ${-days} 天` : days === 0 ? "今日到期" : `${days} 天后到期`}
     </span>
   )
 }
@@ -148,22 +148,29 @@ export function NodeCard({
   return (
     <Card
       onClick={onOpen}
-      className="group flex h-full flex-col justify-between min-w-0 cursor-pointer gap-0 rounded-[2px] border border-border/80 bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/40 hover:shadow-md active:translate-y-0"
+      className={cn(
+        "group flex h-full flex-col justify-between min-w-0 cursor-pointer gap-0 rounded-[2px] border border-border/80 bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/40 hover:shadow-md active:translate-y-0",
+        !node.online && "opacity-60 hover:opacity-90",
+      )}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpen())}
     >
       <div>
         {/* 头部：节点名称、国家与状态 */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-1.5">
               <Country node={node} />
               <h3 className="truncate font-semibold tracking-tight transition-colors group-hover:text-foreground" title={node.name}>
                 {node.name}
               </h3>
             </div>
-            <p className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+            <Status node={node} />
+          </div>
+          {/* 系统信息与到期时间同一行 */}
+          <div className="flex min-w-0 items-center justify-between gap-3 text-xs text-muted-foreground">
+            <p className="flex min-w-0 items-center gap-1.5">
               {node.os && <OsIcon os={node.os} />}
               <span className="truncate">
                 {node.os
@@ -171,21 +178,17 @@ export function NodeCard({
                   : "等待首次上报"}
               </span>
             </p>
-          </div>
-          {/* 状态与到期时间 */}
-          <div className="flex shrink-0 flex-col items-end gap-1">
-            <Status node={node} />
             <Expiry node={node} />
           </div>
         </div>
 
         {/* 资源指标度量网格：不论已部署还是待接入，均保持对齐网格结构 */}
         {deployed(node) ? (
-          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5">
+          <div className="mt-4 flex flex-col gap-2.5">
             <Meter
-              label={`CPU ${node.cpu_cores} 核`}
+              label="CPU"
               pct={m ? m.cpu : null}
-              foot={m ? m.load.map((n) => n.toFixed(2)).join(" ") : "—"}
+              foot={`${node.cpu_cores} 核 · 负载 ${m ? m.load.map((n) => n.toFixed(2)).join(" ") : "—"}`}
             />
             <Meter
               label="内存"
@@ -197,40 +200,38 @@ export function NodeCard({
               pct={m ? percent(m.disk_used, m.disk_total) : null}
               foot={m ? pair(m.disk_used, m.disk_total) : bytes(node.disk_total)}
             />
-            <Meter
-              label="流量"
-              pct={node.traffic_limit > 0 ? percent(monthUsage(node), node.traffic_limit) : null}
-              empty={FOREVER}
-              foot={trafficFoot(node)}
-            />
+            {node.traffic_limit > 0 ? (
+              <Meter label="流量" pct={percent(monthUsage(node), node.traffic_limit)} foot={trafficFoot(node)} />
+            ) : (
+              <MeterText label="流量" value={trafficFoot(node)} />
+            )}
           </div>
         ) : (
-          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5">
-            <Meter label="CPU 核心" pct={null} foot="未就绪" />
+          <div className="mt-4 flex flex-col gap-2.5">
+            <Meter label="CPU" pct={null} foot="未就绪" />
             <Meter label="内存" pct={null} foot="未就绪" />
             <Meter label="硬盘" pct={null} foot="未就绪" />
-            <Meter label="流量" pct={null} empty={FOREVER} foot="未就绪" />
+            <MeterText label="流量" value="未就绪" />
           </div>
         )}
 
-        {/* 实时网速与累计流量横栏 */}
-        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-1.5 border-t border-border/60 pt-3 text-xs">
-          <span className="tnum inline-flex items-center gap-1 font-medium text-foreground">
-            <ArrowDown className="size-3 text-muted-foreground" />
-            {m ? rate(m.net_rx) : "—"}
-          </span>
-          <span className="tnum inline-flex items-center gap-1 font-medium text-foreground">
-            <ArrowUp className="size-3 text-muted-foreground" />
-            {m ? rate(m.net_tx) : "—"}
-          </span>
-          <span className="tnum inline-flex items-center gap-1 text-xs text-muted-foreground font-mono">
-            <ArrowDown className="size-3 opacity-80" />
-            {deployed(node) ? bytes(node.total_rx) : "—"}
-          </span>
-          <span className="tnum inline-flex items-center gap-1 text-xs text-muted-foreground font-mono">
-            <ArrowUp className="size-3 opacity-80" />
-            {deployed(node) ? bytes(node.total_tx) : "—"}
-          </span>
+        {/* 实时网速（主）与累计流量（次） */}
+        <div className="mt-4 grid grid-cols-2 gap-x-4 border-t border-border/60 pt-3">
+          {([
+            ["下行", ArrowDown, m ? rate(m.net_rx) : "—", node.total_rx],
+            ["上行", ArrowUp, m ? rate(m.net_tx) : "—", node.total_tx],
+          ] as const).map(([label, Icon, now, total]) => (
+            <div key={label} className="flex min-w-0 flex-col gap-0.5">
+              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                <Icon className="size-3" />
+                {label}
+              </span>
+              <span className="tnum truncate whitespace-nowrap font-mono text-sm font-semibold text-foreground">{now}</span>
+              <span className="tnum truncate whitespace-nowrap font-mono text-[11px] text-muted-foreground">
+                累计 {deployed(node) ? bytes(total) : "—"}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 
